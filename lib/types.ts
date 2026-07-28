@@ -1,9 +1,18 @@
+export type Posicao = "defensor" | "meio" | "atacante";
+
 export interface Jogador {
   id: string;
   nome: string;
   apelido: string;
   telefone: string;
+  posicao?: Posicao;
 }
+
+export const POSICOES: { valor: Posicao; rotulo: string; abrev: string }[] = [
+  { valor: "defensor", rotulo: "Defensor", abrev: "DEF" },
+  { valor: "meio", rotulo: "Meio-campo", abrev: "MEI" },
+  { valor: "atacante", rotulo: "Atacante", abrev: "ATA" },
+];
 
 export interface MensalistaMes {
   selecionados: string[];
@@ -20,7 +29,7 @@ export interface JogoAvulso {
   observacao: string;
 }
 
-export type ResultadoRodada = "vermelho" | "azul" | "empate";
+export type ResultadoRodada = "vermelho" | "azul" | "empate" | "andamento";
 
 export interface Rodada {
   id: string;
@@ -28,6 +37,8 @@ export interface Rodada {
   timeVermelho: string[];
   timeAzul: string[];
   resultado: ResultadoRodada;
+  /** Gols marcados por jogador nesta rodada (jogadorId → gols). Alimenta a nota. */
+  gols?: Record<string, number>;
 }
 
 export interface CampeaoTrimestral {
@@ -56,6 +67,7 @@ export interface Configuracoes {
   pixAvulso: string;
   localPadrao: string;
   horarioPadrao: string;
+  instagram: string;
 }
 
 export interface Estado {
@@ -66,6 +78,9 @@ export interface Estado {
   despesas: Lancamento[];
   receitasExtras: Lancamento[];
   rodadas: Rodada[];
+  /** Rodadas de trimestrais já encerrados. Não contam na classificação atual,
+   *  mas mantêm a nota dos jogadores viva entre um trimestral e outro. */
+  rodadasArquivadas: Rodada[];
   campeoes: CampeaoTrimestral[];
   configuracoes: Configuracoes;
 }
@@ -90,6 +105,7 @@ export const estadoInicial: Estado = {
   despesas: [],
   receitasExtras: [],
   rodadas: [],
+  rodadasArquivadas: [],
   campeoes: [],
   configuracoes: {
     valorMensal: 70,
@@ -98,5 +114,6 @@ export const estadoInicial: Estado = {
     pixAvulso: "futgibs@gmail.com",
     localPadrao: "Camisa 9",
     horarioPadrao: "21:00",
+    instagram: "",
   },
 };

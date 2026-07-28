@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import {
+  ArrowLeftRight,
+  CheckCheck,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -11,6 +13,7 @@ import {
   Medal,
   Pencil,
   Plus,
+  Shuffle,
   Swords,
   Trash2,
   Trophy,
@@ -35,11 +38,18 @@ import {
   removerCampeao,
   removerRodada,
 } from "@/lib/acoes";
-import { classificacaoMensal, getMensalMes, rodadasOrdenadas } from "@/lib/calculos";
+import { NOTA_BASE, classificacaoMensal, getMensalMes, notasJogadores, rodadasOrdenadas, sortearTimes } from "@/lib/calculos";
 import { calcularDiaSemana, cn, dataBR, hoje, nomeMes, tercaDaSemana } from "@/lib/utils";
-import type { CampeaoTrimestral, Jogador, ResultadoRodada } from "@/lib/types";
+import type { CampeaoTrimestral, Jogador, Posicao, ResultadoRodada } from "@/lib/types";
 
 type Time = "vermelho" | "azul";
+
+const POS_ABREV: Record<Posicao, string> = { defensor: "DEF", meio: "MEI", atacante: "ATA" };
+const POS_COR: Record<Posicao, string> = {
+  defensor: "bg-blue-light text-blue",
+  meio: "bg-success-bg text-success",
+  atacante: "bg-red-light text-red",
+};
 
 /** Sugere um rótulo de trimestre a partir do mês de referência (ex.: "3º Trimestre 2026"). */
 function sugestaoTrimestre(mes: string): string {
@@ -51,8 +61,10 @@ function sugestaoTrimestre(mes: string): string {
 export default function ClassificacaoPage() {
   const { estado, carregando, atualizarEstado } = useEstado();
   const [data, setData] = useState(tercaDaSemana());
+  const [selManual, setSelManual] = useState<Set<string> | null>(null);
   const [times, setTimes] = useState<Record<string, Time>>({});
-  const [resultado, setResultado] = useState<ResultadoRodada>("empate");
+  const [gols, setGols] = useState<Record<string, number>>({});
+  const [resultado, setResultado] = useState<ResultadoRodada>("andamento");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
   const carrosselRef = useRef<HTMLDivElement>(null);
@@ -70,31 +82,90 @@ export default function ClassificacaoPage() {
   const historico = rodadasOrdenadas(estado);
   const lider = classificacao[0];
 
-  // Elenco do formulário: confirmados do mês + quem já estava escalado na rodada em edição.
-  const elenco = [...confirmados];
-  for (const id of Object.keys(times)) {
-    if (!elenco.some((j) => j.id === id)) {
-      const j = estado.jogadores.find((x) => x.id === id);
-      if (j) elenco.push(j);
+  const notas = notasJogadores(estado);
+  const notaDe = (id: string) => notas.get(id)?.nota ?? NOTA_BASE;
+
+  // Seleção de quem vai jogar a rodada. Enquanto o admin não mexe, usa os confirmados do mês.
+  const confirmadosIds = new Set(confirmados.map((j) => j.id));
+  const selecionados = selManual ?? confirmadosIds;
+
+  const porNota = (a: Jogador, b: Jogador) => notaDe(b.id) - notaDe(a.id) || a.nome.localeCompare(b.nome);
+  const timeVermelho = estado.jogadores.filter((j) => times[j.id] === "vermelho").sort(porNota);
+  const timeAzul = estado.jogadores.filter((j) => times[j.id] === "azul").sort(porNota);
+  const sorteado = timeVermelho.length > 0 || timeAzul.length > 0;
+
+  // Lista para o painel de seleção: confirmados primeiro, depois o resto.
+  const jogadoresOrdenados = [...estado.jogadores].sort(
+    (a, b) => Number(confirmadosIds.has(b.id)) - Number(confirmadosIds.has(a.id)) || a.nome.localeCompare(b.nome),
+  );
+
+  /** Marca/desmarca um jogador para a rodada (só seleção — os times saem do sorteio). */
+  function alternarSelecao(jogadorId: string) {
+    const base = new Set(selecionados);
+    if (base.has(jogadorId)) {
+      base.delete(jogadorId);
+      removerDoTime(jogadorId); // se já estava escalado, tira de campo também
+    } else {
+      base.add(jogadorId);
     }
+    setSelManual(base);
   }
 
-  const timeVermelho = elenco.filter((j) => times[j.id] === "vermelho");
-  const timeAzul = elenco.filter((j) => times[j.id] === "azul");
+  function selecionarConfirmados() {
+    setSelManual(new Set(confirmadosIds));
+  }
+  function limparSelecao() {
+    setSelManual(new Set());
+    setTimes({});
+    setGols({});
+  }
 
-  function definirTime(jogadorId: string, time: Time) {
+  /** Sorteia os selecionados em dois times equilibrados por posição e nota. */
+  function sortearFormulario() {
+    const lista = estado.jogadores
+      .filter((j) => selecionados.has(j.id))
+      .map((j) => ({ id: j.id, nome: j.nome, posicao: j.posicao, nota: notaDe(j.id) }));
+    if (lista.length < 2) {
+      alert("Selecione pelo menos 2 jogadores para sortear.");
+      return;
+    }
+    const r = sortearTimes(lista, Math.ceil(lista.length / 2));
+    const mapa: Record<string, Time> = {};
+    r.vermelho.forEach((j) => (mapa[j.id] = "vermelho"));
+    r.azul.forEach((j) => (mapa[j.id] = "azul"));
+    setTimes(mapa);
+  }
+
+  /** Move o jogador para o outro time. */
+  function trocarTime(jogadorId: string) {
+    setTimes((atual) => ({ ...atual, [jogadorId]: atual[jogadorId] === "vermelho" ? "azul" : "vermelho" }));
+  }
+
+  /** Tira o jogador de campo e desmarca da rodada. */
+  function removerDoTime(jogadorId: string) {
     setTimes((atual) => {
       const proximo = { ...atual };
-      if (proximo[jogadorId] === time) delete proximo[jogadorId];
-      else proximo[jogadorId] = time;
+      delete proximo[jogadorId];
       return proximo;
+    });
+    setGols((atual) => {
+      const proximo = { ...atual };
+      delete proximo[jogadorId];
+      return proximo;
+    });
+    setSelManual((atual) => {
+      const base = new Set(atual ?? selecionados);
+      base.delete(jogadorId);
+      return base;
     });
   }
 
   function resetarFormulario() {
     setEditandoId(null);
+    setSelManual(null);
     setTimes({});
-    setResultado("empate");
+    setGols({});
+    setResultado("andamento");
     setData(tercaDaSemana());
   }
 
@@ -103,22 +174,100 @@ export default function ClassificacaoPage() {
     (r.timeVermelho ?? []).forEach((id) => (mapa[id] = "vermelho"));
     (r.timeAzul ?? []).forEach((id) => (mapa[id] = "azul"));
     setEditandoId(r.id);
+    setSelManual(new Set([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]));
     setTimes(mapa);
+    setGols(r.gols ?? {});
     setResultado(r.resultado);
     setData(r.data);
     formularioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function definirGols(jogadorId: string, valor: number) {
+    setGols((atual) => {
+      const proximo = { ...atual };
+      if (valor > 0) proximo[jogadorId] = valor;
+      else delete proximo[jogadorId];
+      return proximo;
+    });
+  }
+
+  /** Uma linha de jogador dentro de um time: posição, nota, gols, trocar de lado e tirar de campo. */
+  const linhaTime = (j: Jogador) => {
+    const g = gols[j.id] ?? 0;
+    return (
+      <div
+        key={j.id}
+        className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-1.5"
+      >
+        {j.posicao && (
+          <span className={cn("shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold", POS_COR[j.posicao])}>
+            {POS_ABREV[j.posicao]}
+          </span>
+        )}
+        <strong className="flex-1 truncate text-[13px]">{j.nome}</strong>
+        <span className="shrink-0 text-[11px] font-bold text-muted">{notaDe(j.id).toFixed(1)}</span>
+        <div className="flex shrink-0 items-center gap-0.5 rounded-sm border border-border-2 bg-white px-1 py-0.5">
+          <button
+            type="button"
+            aria-label="Menos um gol"
+            onClick={() => definirGols(j.id, g - 1)}
+            disabled={g <= 0}
+            className="flex size-5 items-center justify-center rounded-sm text-sm font-bold text-text-2 hover:bg-surface-2 disabled:opacity-40"
+          >
+            −
+          </button>
+          <span className="w-4 text-center text-[13px] font-extrabold tabular-nums">{g}</span>
+          <span className="text-xs">⚽</span>
+          <button
+            type="button"
+            aria-label="Mais um gol"
+            onClick={() => definirGols(j.id, g + 1)}
+            className="flex size-5 items-center justify-center rounded-sm text-sm font-bold text-text-2 hover:bg-surface-2"
+          >
+            +
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => trocarTime(j.id)}
+          title="Trocar de time"
+          className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface-2 hover:text-blue"
+        >
+          <ArrowLeftRight className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => removerDoTime(j.id)}
+          title="Tirar de campo"
+          className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-danger-bg hover:text-danger"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    );
+  };
+
   function salvarRodada() {
-    if (!timeVermelho.length || !timeAzul.length) {
-      alert("Escale pelo menos um jogador em cada time.");
+    if (!sorteado) {
+      alert("Sorteie os times antes de registrar a rodada.");
       return;
+    }
+    if (!timeVermelho.length || !timeAzul.length) {
+      alert("Cada time precisa de pelo menos um jogador.");
+      return;
+    }
+    // Mantém apenas os gols de quem está escalado nesta rodada.
+    const escalados = new Set([...timeVermelho, ...timeAzul].map((j) => j.id));
+    const golsRodada: Record<string, number> = {};
+    for (const [id, qtd] of Object.entries(gols)) {
+      if (escalados.has(id) && qtd > 0) golsRodada[id] = qtd;
     }
     const dados = {
       data,
       timeVermelho: timeVermelho.map((j) => j.id),
       timeAzul: timeAzul.map((j) => j.id),
       resultado,
+      gols: golsRodada,
     };
     if (editandoId) {
       const id = editandoId;
@@ -127,9 +276,15 @@ export default function ClassificacaoPage() {
       alert("Rodada atualizada e classificação recalculada.");
     } else {
       atualizarEstado((atual) => adicionarRodada(atual, dados));
+      setSelManual(null);
       setTimes({});
-      setResultado("empate");
-      alert("Rodada registrada e classificação atualizada.");
+      setGols({});
+      setResultado("andamento");
+      alert(
+        resultado === "andamento"
+          ? "Rodada sorteada e divulgada como próxima rodada. Edite depois para lançar o resultado."
+          : "Rodada registrada e classificação atualizada.",
+      );
     }
   }
 
@@ -348,8 +503,8 @@ export default function ClassificacaoPage() {
               {editandoId ? "Editar rodada" : "Nova rodada"}
             </CardTitle>
             <CardDescription>
-              Escale cada mensalista no time <span className="font-bold text-red">Vermelho</span> ou{" "}
-              <span className="font-bold text-blue">Azul</span>, informe o resultado e{" "}
+              <span className="font-bold">Sorteie os times</span> (equilíbrio por posição e nota), ajuste manualmente se
+              quiser, marque os <span className="font-bold">gols</span> (contam no ranking), informe o resultado e{" "}
               {editandoId ? "salve as alterações." : "registre."}
             </CardDescription>
           </div>
@@ -360,11 +515,11 @@ export default function ClassificacaoPage() {
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {elenco.length === 0 ? (
-            <Vazio texto="Nenhum mensalista confirmado neste mês. Gere a lista na aba Mensalistas primeiro." />
+          {estado.jogadores.length === 0 ? (
+            <Vazio texto="Nenhum jogador cadastrado. Cadastre na aba Jogadores primeiro." />
           ) : (
             <>
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
                 <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-muted">
                   Data da rodada · {calcularDiaSemana(data)}
                   <input
@@ -374,60 +529,95 @@ export default function ClassificacaoPage() {
                     className="min-h-10 rounded-sm border border-border-2 bg-white px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-blue-3 focus:shadow-[0_0_0_3px_rgba(59,130,246,.18)]"
                   />
                 </label>
-                <div className="flex items-center gap-2 text-[13px]">
-                  <Badge className="bg-red-light text-red">🔴 Vermelho: {timeVermelho.length}</Badge>
-                  <Badge className="bg-blue-light text-blue">🔵 Azul: {timeAzul.length}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={selecionarConfirmados}>
+                    <CheckCheck /> Confirmados
+                  </Button>
+                  <Button variant="ghost" onClick={limparSelecao}>
+                    <X /> Limpar
+                  </Button>
                 </div>
               </div>
 
-              <div className="grid gap-1.5">
-                {elenco.map((j) => {
-                  const time = times[j.id];
-                  return (
-                    <div
-                      key={j.id}
-                      className={cn(
-                        "flex items-center justify-between gap-3 rounded-sm border px-3.5 py-2 transition-colors",
-                        time === "vermelho" && "border-red bg-red-light/50",
-                        time === "azul" && "border-blue-3 bg-blue-light/50",
-                        !time && "border-border bg-surface",
-                      )}
-                    >
-                      <strong className="text-[13.5px]">{j.nome}</strong>
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() => definirTime(j.id, "vermelho")}
-                          className={cn(
-                            "rounded-sm px-3 py-1.5 text-xs font-bold transition-colors",
-                            time === "vermelho"
-                              ? "bg-red text-white"
-                              : "bg-red-light text-red hover:bg-red hover:text-white",
-                          )}
-                        >
-                          Vermelho
-                        </button>
-                        <button
-                          onClick={() => definirTime(j.id, "azul")}
-                          className={cn(
-                            "rounded-sm px-3 py-1.5 text-xs font-bold transition-colors",
-                            time === "azul"
-                              ? "bg-blue text-white"
-                              : "bg-blue-light text-blue hover:bg-blue hover:text-white",
-                          )}
-                        >
-                          Azul
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Passo 1: selecionar quem vai jogar */}
+              <div>
+                <span className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted">
+                  <PassoNumero numero={1} /> Quem vai jogar ({selecionados.size})
+                </span>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+                  {jogadoresOrdenados.map((j) => {
+                    const ativo = selecionados.has(j.id);
+                    return (
+                      <button
+                        key={j.id}
+                        onClick={() => alternarSelecao(j.id)}
+                        className={cn(
+                          "flex items-center justify-between gap-2 rounded-sm border px-3 py-2 text-left transition-colors",
+                          ativo ? "border-blue bg-blue-light/60" : "border-border bg-surface hover:border-blue-3",
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <strong className="block truncate text-[13px]">{j.nome}</strong>
+                          <small className="text-[11px] text-muted">
+                            {j.posicao ? POS_ABREV[j.posicao] : "—"} · {notaDe(j.id).toFixed(1)}
+                          </small>
+                        </span>
+                        {ativo && <span className="text-blue">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Passo 2: sortear (obrigatório) */}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted">
+                  <PassoNumero numero={2} /> Sortear
+                </span>
+                <Button onClick={sortearFormulario} disabled={selecionados.size < 2}>
+                  <Shuffle /> {sorteado ? "Sortear novamente" : "Sortear times"}
+                </Button>
+                <div className="flex items-center gap-2 text-[13px]">
+                  <Badge className="bg-red-light text-red">🔴 {timeVermelho.length}</Badge>
+                  <Badge className="bg-blue-light text-blue">🔵 {timeAzul.length}</Badge>
+                </div>
+              </div>
+
+              {!sorteado ? (
+                <div className="rounded-md border border-dashed border-border-2 bg-surface-2 p-6 text-center text-sm text-muted">
+                  Selecione os jogadores acima e clique em <strong>Sortear times</strong>. Depois dá para ajustar
+                  manualmente com <ArrowLeftRight className="inline size-3.5" /> (trocar de time) e{" "}
+                  <X className="inline size-3.5" /> (tirar de campo).
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border border-red/40 bg-red-light/20 p-2.5">
+                    <div className="mb-2 flex items-center justify-between px-1">
+                      <strong className="text-[13px] text-red">🔴 Time Vermelho</strong>
+                      <span className="text-[11px] font-bold text-muted">
+                        {timeVermelho.length} · nota {timeVermelho.reduce((s, j) => s + notaDe(j.id), 0).toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">{timeVermelho.map(linhaTime)}</div>
+                  </div>
+                  <div className="rounded-md border border-blue-3/40 bg-blue-light/20 p-2.5">
+                    <div className="mb-2 flex items-center justify-between px-1">
+                      <strong className="text-[13px] text-blue">🔵 Time Azul</strong>
+                      <span className="text-[11px] font-bold text-muted">
+                        {timeAzul.length} · nota {timeAzul.reduce((s, j) => s + notaDe(j.id), 0).toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">{timeAzul.map(linhaTime)}</div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Resultado</span>
                 <div className="flex flex-wrap gap-2">
                   {(
                     [
+                      ["andamento", "⏳ Em andamento", "bg-muted text-white"],
                       ["vermelho", "🔴 Vermelho venceu", "bg-red text-white"],
                       ["empate", "🤝 Empate", "bg-warning text-white"],
                       ["azul", "🔵 Azul venceu", "bg-blue text-white"],
@@ -455,7 +645,7 @@ export default function ClassificacaoPage() {
                     </>
                   ) : (
                     <>
-                      <Trophy /> Registrar rodada
+                      <Trophy /> {resultado === "andamento" ? "Registrar sorteio" : "Registrar rodada"}
                     </>
                   )}
                 </Button>
@@ -505,7 +695,9 @@ export default function ClassificacaoPage() {
                     ? { rotulo: "Vermelho venceu", classe: "bg-red-light text-red", emoji: "🔴" }
                     : r.resultado === "azul"
                       ? { rotulo: "Azul venceu", classe: "bg-blue-light text-blue", emoji: "🔵" }
-                      : { rotulo: "Empate", classe: "bg-warning-bg text-warning", emoji: "🤝" };
+                      : r.resultado === "andamento"
+                        ? { rotulo: "Em andamento", classe: "bg-surface-2 text-muted", emoji: "⏳" }
+                        : { rotulo: "Empate", classe: "bg-warning-bg text-warning", emoji: "🤝" };
                 return (
                   <div
                     key={r.id}

@@ -2,17 +2,29 @@
 
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EstadoLoading } from "@/components/layout/estado-loading";
 import { useEstado } from "@/lib/estado-context";
 import { adicionarJogador, atualizarJogador, removerJogador, limparTudo } from "@/lib/acoes";
-import type { Jogador } from "@/lib/types";
+import { POSICOES, type Jogador, type Posicao } from "@/lib/types";
 
-const FORM_VAZIO = { nome: "", apelido: "", telefone: "" };
+const FORM_VAZIO = { nome: "", apelido: "", telefone: "", posicao: "" as Posicao | "" };
+
+const CORES_POSICAO: Record<Posicao, string> = {
+  defensor: "bg-blue-light text-blue",
+  meio: "bg-success-bg text-success",
+  atacante: "bg-red-light text-red",
+};
+
+function rotuloPosicao(posicao?: Posicao) {
+  return POSICOES.find((p) => p.valor === posicao)?.rotulo;
+}
 
 export default function JogadoresPage() {
   const { estado, carregando, atualizarEstado } = useEstado();
@@ -32,7 +44,12 @@ export default function JogadoresPage() {
       alert("Informe o nome do jogador.");
       return;
     }
-    const dados = { nome, apelido: form.apelido.trim(), telefone: form.telefone.trim() };
+    const dados = {
+      nome,
+      apelido: form.apelido.trim(),
+      telefone: form.telefone.trim(),
+      ...(form.posicao ? { posicao: form.posicao } : {}),
+    };
     if (editandoId) {
       if (!confirm("Confirmar alterações neste jogador?")) return;
       atualizarEstado((atual) => atualizarJogador(atual, editandoId, dados));
@@ -44,7 +61,12 @@ export default function JogadoresPage() {
 
   function editar(jogador: Jogador) {
     if (!confirm(`Editar o perfil de ${jogador.nome}?`)) return;
-    setForm({ nome: jogador.nome, apelido: jogador.apelido, telefone: jogador.telefone });
+    setForm({
+      nome: jogador.nome,
+      apelido: jogador.apelido,
+      telefone: jogador.telefone,
+      posicao: jogador.posicao ?? "",
+    });
     setEditandoId(jogador.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -70,7 +92,7 @@ export default function JogadoresPage() {
           <CardDescription>Cadastre os jogadores do grupo para usá-los em mensalistas e avulsos.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label htmlFor="jNome">Nome</Label>
               <Input
@@ -88,6 +110,21 @@ export default function JogadoresPage() {
                 value={form.apelido}
                 onChange={(e) => setForm((f) => ({ ...f, apelido: e.target.value }))}
               />
+            </div>
+            <div>
+              <Label htmlFor="jPosicao">Posição</Label>
+              <Select
+                id="jPosicao"
+                value={form.posicao}
+                onChange={(e) => setForm((f) => ({ ...f, posicao: e.target.value as Posicao | "" }))}
+              >
+                <option value="">Sem posição</option>
+                {POSICOES.map((p) => (
+                  <option key={p.valor} value={p.valor}>
+                    {p.rotulo}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div>
               <Label htmlFor="jTelefone">Telefone</Label>
@@ -132,6 +169,7 @@ export default function JogadoresPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Jogador</TableHead>
+                  <TableHead>Posição</TableHead>
                   <TableHead>Telefone</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -151,6 +189,13 @@ export default function JogadoresPage() {
                           </small>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {jogador.posicao ? (
+                        <Badge className={CORES_POSICAO[jogador.posicao]}>{rotuloPosicao(jogador.posicao)}</Badge>
+                      ) : (
+                        <span className="text-muted-2">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {jogador.telefone ? (

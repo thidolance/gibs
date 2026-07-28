@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gibs FC · Início</title>
+  <link rel="icon" href="/gibs-logo.avif" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/gibs.css" />
+</head>
+<body data-page="inicio">
+  <header data-gibs-masthead></header>
+
+  <main class="wrap">
+    <section class="hero">
+      <span class="kicker"><span class="pip"></span> Futebol de quarta</span>
+      <img class="crestbig" src="/gibs-logo.avif" alt="Gibs FC" />
+      <h1>Bem-vindo ao <span class="grad-rb">Gibs FC</span></h1>
+      <p>Classificação, ranking dos jogadores, rodadas disputadas e a loja oficial — tudo num lugar só.</p>
+      <div class="cta-row">
+        <a class="btn" href="publico.html#classificacao">Ver classificação</a>
+        <a class="btn ghost" href="loja.html">Loja do Gibs</a>
+      </div>
+    </section>
+
+    <section class="grid-acesso" style="margin-bottom:28px">
+      <div class="acesso" id="dest-lider">
+        <div class="ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></div>
+        <h3 style="font-size:14px;color:var(--muted)">Líder</h3>
+        <strong id="lider-nome" style="font-size:20px">—</strong>
+        <span id="lider-info" class="seta" style="color:var(--muted)">carregando…</span>
+      </div>
+      <div class="acesso" id="dest-nota">
+        <div class="ic a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <h3 style="font-size:14px;color:var(--muted)">Melhor nota</h3>
+        <strong id="nota-nome" style="font-size:20px">—</strong>
+        <span id="nota-info" class="seta" style="color:var(--muted)">carregando…</span>
+      </div>
+      <div class="acesso" id="dest-rodadas">
+        <div class="ic v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/></svg></div>
+        <h3 style="font-size:14px;color:var(--muted)">Rodadas</h3>
+        <strong id="rodadas-num" style="font-size:20px">—</strong>
+        <span class="seta" style="color:var(--muted)">partidas disputadas</span>
+      </div>
+    </section>
+
+    <div class="sec-titulo">Explorar</div>
+    <h2 class="sec-h2">O que rola no <span>Gibs</span></h2>
+    <section class="grid-acesso">
+      <a class="acesso" href="publico.html#classificacao">
+        <div class="ic v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></div>
+        <h3>Classificação</h3>
+        <p>A disputa do trimestral, pontos por vitória e empate.</p>
+        <span class="seta">Ver tabela →</span>
+      </a>
+      <a class="acesso" href="publico.html#ranking">
+        <div class="ic a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <h3>Ranking</h3>
+        <p>A nota de cada jogador, gols e quem subiu ou caiu.</p>
+        <span class="seta">Ver ranking →</span>
+      </a>
+      <a class="acesso" href="publico.html#rodadas">
+        <div class="ic v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/></svg></div>
+        <h3>Rodadas</h3>
+        <p>Todas as partidas: times, gols e resultados.</p>
+        <span class="seta">Ver rodadas →</span>
+      </a>
+      <a class="acesso" href="loja.html">
+        <div class="ic a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg></div>
+        <h3>Loja</h3>
+        <p>Os uniformes oficiais do Gibs FC.</p>
+        <span class="seta">Ver vitrine →</span>
+      </a>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    Gibs FC · Futebol de quarta · <a href="/">Área administrativa</a>
+  </footer>
+
+  <script src="/assets/gibs.js"></script>
+  <script>
+    GIBS.carregar().then((estado) => {
+      const cl = GIBS.classificacao(estado);
+      const rk = GIBS.ranking(estado);
+      if (cl[0]) { document.getElementById("lider-nome").textContent = cl[0].jogador.nome; document.getElementById("lider-info").textContent = cl[0].pontos + " pts"; }
+      if (rk[0]) { document.getElementById("nota-nome").textContent = rk[0].jogador.nome; document.getElementById("nota-info").textContent = "nota " + rk[0].stats.nota.toFixed(1); }
+      document.getElementById("rodadas-num").textContent = estado.rodadas.length;
+    }).catch(() => {});
+  </script>
+</body>
+</html>

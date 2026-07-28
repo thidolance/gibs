@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gibs FC · Loja</title>
+  <link rel="icon" href="/gibs-logo.avif" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/gibs.css" />
+</head>
+<body data-page="loja">
+  <header data-gibs-masthead></header>
+
+  <main class="wrap">
+    <div class="sec-titulo">Loja oficial</div>
+    <h2 class="sec-h2">Uniformes do <span>Gibs FC</span></h2>
+    <div id="vitrine"><div class="estado"><div class="spinner"></div>Carregando a vitrine…</div></div>
+  </main>
+
+  <footer class="rodape">Gibs FC · <a href="inicio.html">Início</a> · <a href="publico.html#classificacao">Classificação</a></footer>
+
+  <script src="/assets/gibs.js"></script>
+  <script>
+    const alvo = document.getElementById("vitrine");
+    let INSTA = "";
+
+    function card(u, i) {
+      const G = window.GIBS;
+      const tams = (u.tamanhos || []).map((t) => "<span>" + G.esc(t) + "</span>").join("");
+      const cta = INSTA
+        ? '<a class="btn cta" href="https://instagram.com/' + G.esc(INSTA) + '" target="_blank" rel="noopener">Tenho interesse</a>'
+        : "";
+      const esgotado = u.disponivel === false ? '<div class="esgotado"><span>Esgotado</span></div>' : "";
+      const foto = u.foto ? '<img src="' + G.esc(u.foto) + '" alt="' + G.esc(u.nome) + '" loading="lazy" />' : "";
+      return '<div class="produto" style="animation-delay:' + Math.min(i * 60, 700) + 'ms">' +
+        '<div class="foto">' + foto + esgotado + "</div>" +
+        '<div class="info">' +
+        (u.tipo ? '<span class="tipo">' + G.esc(u.tipo) + "</span>" : "") +
+        '<span class="nome">' + G.esc(u.nome) + "</span>" +
+        (u.descricao ? '<span class="desc">' + G.esc(u.descricao) + "</span>" : "") +
+        (tams ? '<div class="tams">' + tams + "</div>" : "") +
+        '<span class="preco">' + G.dinheiro(u.preco) + "</span>" +
+        (u.disponivel === false ? "" : cta) +
+        "</div></div>";
+    }
+
+    // Header + instagram (do estado) e a lista da loja (nó separado), em paralelo.
+    Promise.all([GIBS.carregar(), GIBS.carregarLoja()])
+      .then(([estado, loja]) => {
+        INSTA = (estado.configuracoes.instagram || "").replace(/^@/, "");
+        if (!loja.length) {
+          alvo.innerHTML = '<div class="board" style="background:transparent;border:0;box-shadow:none"><div class="vazio">Nenhum uniforme cadastrado ainda. Volte em breve! 👕</div></div>';
+          return;
+        }
+        alvo.innerHTML = '<div class="vitrine">' + loja.map(card).join("") + "</div>";
+      })
+      .catch(() => { alvo.innerHTML = '<div class="estado">Não foi possível carregar a loja. Tente novamente mais tarde.</div>'; });
+  </script>
+</body>
+</html>

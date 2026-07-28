@@ -1,4 +1,4 @@
-import type { CampeaoTrimestral, Estado, Jogador, JogoAvulso, Lancamento, MensalistaMes, Rodada } from "./types";
+import type { CampeaoTrimestral, Estado, Jogador, JogoAvulso, Lancamento, MensalistaMes, Posicao, Rodada } from "./types";
 import { estadoInicial } from "./types";
 import { calcularDiaSemana, dataBR, dinheiroSimples, gerarId, nomeMes, nomeMesCurto } from "./utils";
 
@@ -203,13 +203,29 @@ export function normalizarEstado(valor: unknown): Estado {
     };
   }
 
-  const rodadas = normalizarArr<Partial<Rodada> & Record<string, unknown>>(v.rodadas).map((r) => ({
+  const normalizarGols = (valor: unknown): Record<string, number> => {
+    if (!valor || typeof valor !== "object") return {};
+    const gols: Record<string, number> = {};
+    for (const [id, n] of Object.entries(valor as Record<string, unknown>)) {
+      const qtd = Number(n);
+      if (qtd > 0) gols[id] = qtd;
+    }
+    return gols;
+  };
+
+  const normalizarRodada = (r: Partial<Rodada> & Record<string, unknown>): Rodada => ({
     id: (r.id as string) ?? gerarId(),
     data: (r.data as string) ?? "",
     timeVermelho: normalizarArr<string>(r.timeVermelho),
     timeAzul: normalizarArr<string>(r.timeAzul),
     resultado: (r.resultado as Rodada["resultado"]) ?? "empate",
-  }));
+    gols: normalizarGols(r.gols),
+  });
+
+  const rodadas = normalizarArr<Partial<Rodada> & Record<string, unknown>>(v.rodadas).map(normalizarRodada);
+  const rodadasArquivadas = normalizarArr<Partial<Rodada> & Record<string, unknown>>(v.rodadasArquivadas).map(
+    normalizarRodada,
+  );
 
   const campeoes = normalizarArr<Partial<CampeaoTrimestral> & Record<string, unknown>>(v.campeoes).map((c) => ({
     id: (c.id as string) ?? gerarId(),
@@ -219,14 +235,27 @@ export function normalizarEstado(valor: unknown): Estado {
     data: (c.data as string) ?? "",
   }));
 
+  const POSICOES_VALIDAS: Posicao[] = ["defensor", "meio", "atacante"];
+  const jogadores = normalizarArr<Partial<Jogador> & Record<string, unknown>>(v.jogadores).map((j) => {
+    const posicao = POSICOES_VALIDAS.includes(j.posicao as Posicao) ? (j.posicao as Posicao) : undefined;
+    return {
+      id: (j.id as string) ?? gerarId(),
+      nome: (j.nome as string) ?? "",
+      apelido: (j.apelido as string) ?? "",
+      telefone: (j.telefone as string) ?? "",
+      ...(posicao ? { posicao } : {}),
+    };
+  });
+
   return {
     mes: v.mes ?? estadoInicial.mes,
-    jogadores: normalizarArr<Jogador>(v.jogadores),
+    jogadores,
     mensalistasPorMes,
     jogosAvulsos,
     despesas: normalizarArr<Lancamento>(v.despesas),
     receitasExtras: normalizarArr<Lancamento>(v.receitasExtras),
     rodadas,
+    rodadasArquivadas,
     campeoes,
     configuracoes: { ...estadoInicial.configuracoes, ...(v.configuracoes ?? {}) },
   };
@@ -264,6 +293,7 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
   getMensalMes(estado, estado.mes).confirmados.forEach(garantir);
 
   for (const r of estado.rodadas) {
+    if (r.resultado === "andamento") continue; // ainda sem resultado: não pontua
     const times: [string[], boolean][] = [
       [r.timeVermelho ?? [], r.resultado === "vermelho"],
       [r.timeAzul ?? [], r.resultado === "azul"],
@@ -298,6 +328,184 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
         b.jogos - a.jogos ||
         a.jogador.nome.localeCompare(b.jogador.nome),
     );
+}
+
+// ── Nota e ranking de jogadores ──────────────────────────────────────────────
+// Todos começam em NOTA_BASE (8). Cada vitória sobe, cada derrota desce e cada
+// gol soma um pouco — sempre travado no intervalo [NOTA_MIN, NOTA_MAX]. Empate é
+// neutro. A nota usa TODAS as rodadas já jogadas (atuais + arquivadas), então ela
+// sobrevive ao encerramento de um trimestral.
+
+export const NOTA_BASE = 6;
+export const NOTA_MIN = 5;
+export const NOTA_MAX = 10;
+export const PASSO_VITORIA = 0.1;
+export const PASSO_DERROTA = 0.2;
+export const PASSO_GOL = 0.1;
+
+function limitar(valor: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, valor));
+}
+
+export interface EstatisticaJogador {
+  vitorias: number;
+  derrotas: number;
+  empates: number;
+  gols: number;
+  jogos: number;
+  nota: number;
+}
+
+/** Agrega vitórias/derrotas/empates/gols de uma lista de rodadas e calcula a nota. */
+export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, EstatisticaJogador> {
+  const stats = new Map<string, EstatisticaJogador>();
+  const garantir = (id: string) => {
+    if (!stats.has(id)) stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE });
+    return stats.get(id)!;
+  };
+
+  for (const r of rodadas) {
+    if (r.resultado === "andamento") continue; // rodada sorteada ainda sem resultado
+    const times: [string[], boolean][] = [
+      [r.timeVermelho ?? [], r.resultado === "vermelho"],
+      [r.timeAzul ?? [], r.resultado === "azul"],
+    ];
+    for (const [jogadores, venceu] of times) {
+      for (const id of jogadores) {
+        const s = garantir(id);
+        s.jogos++;
+        if (r.resultado === "empate") s.empates++;
+        else if (venceu) s.vitorias++;
+        else s.derrotas++;
+        s.gols += Number(r.gols?.[id] ?? 0);
+      }
+    }
+  }
+
+  for (const s of stats.values()) {
+    s.nota = limitar(
+      NOTA_BASE + s.vitorias * PASSO_VITORIA - s.derrotas * PASSO_DERROTA + s.gols * PASSO_GOL,
+      NOTA_MIN,
+      NOTA_MAX,
+    );
+  }
+  return stats;
+}
+
+/** Estatística/nota de cada jogador considerando rodadas atuais + arquivadas. */
+export function notasJogadores(estado: Estado): Map<string, EstatisticaJogador> {
+  return estatisticasPorRodadas([...estado.rodadas, ...(estado.rodadasArquivadas ?? [])]);
+}
+
+export interface LinhaRanking {
+  jogador: Jogador;
+  stats: EstatisticaJogador;
+  posicaoAtual: number;
+  /** + subiu, − caiu, 0 estável/novo desde a rodada anterior. */
+  movimento: number;
+}
+
+/** Estatística do jogador ou o padrão (nota base, tudo zerado) para quem ainda não jogou. */
+function statOuPadrao(stats: Map<string, EstatisticaJogador>, id: string): EstatisticaJogador {
+  return stats.get(id) ?? { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE };
+}
+
+/** Ordena TODOS os jogadores cadastrados por nota (desempate: gols, vitórias, nome). */
+function ordenarPorNota(estado: Estado, stats: Map<string, EstatisticaJogador>): Jogador[] {
+  return [...estado.jogadores].sort((a, b) => {
+    const sa = statOuPadrao(stats, a.id);
+    const sb = statOuPadrao(stats, b.id);
+    return sb.nota - sa.nota || sb.gols - sa.gols || sb.vitorias - sa.vitorias || a.nome.localeCompare(b.nome);
+  });
+}
+
+/**
+ * Ranking por nota com o movimento de posição em relação à rodada anterior:
+ * compara o ranking atual com o ranking calculado sem a última rodada registrada.
+ */
+export function rankingJogadores(estado: Estado): LinhaRanking[] {
+  const todas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])];
+  const statsAtual = estatisticasPorRodadas(todas);
+  const ordemAtual = ordenarPorNota(estado, statsAtual);
+
+  // Ranking anterior = sem a rodada mais recente (por data), para medir o movimento.
+  const anterior = [...todas].sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
+  anterior.pop();
+  const posicaoAnterior = new Map<string, number>();
+  ordenarPorNota(estado, estatisticasPorRodadas(anterior)).forEach((j, i) => posicaoAnterior.set(j.id, i));
+
+  return ordemAtual.map((jogador, i) => {
+    const antes = posicaoAnterior.get(jogador.id);
+    const movimento = antes === undefined ? 0 : antes - i; // subiu = posição menor agora
+    return { jogador, stats: statOuPadrao(statsAtual, jogador.id), posicaoAtual: i + 1, movimento };
+  });
+}
+
+// ── Sorteio equilibrado de times ─────────────────────────────────────────────
+// Distribui os jogadores em dois times por posição (defensor/meio/atacante/sem)
+// e, dentro de cada grupo, joga cada jogador no time de menor soma de nota — o que
+// equilibra tanto a nota quanto a distribuição de posições. Ideal: 16 (8 + 8).
+
+export interface JogadorSorteio {
+  id: string;
+  nome: string;
+  posicao?: Posicao;
+  nota: number;
+}
+
+export interface ResultadoSorteio {
+  vermelho: JogadorSorteio[];
+  azul: JogadorSorteio[];
+  somaVermelho: number;
+  somaAzul: number;
+  mediaVermelho: number;
+  mediaAzul: number;
+}
+
+function somaNotas(time: JogadorSorteio[]) {
+  return time.reduce((s, j) => s + j.nota, 0);
+}
+
+export function sortearTimes(jogadores: JogadorSorteio[], limitePorTime = 8): ResultadoSorteio {
+  const grupos: (Posicao | undefined)[] = ["defensor", "meio", "atacante", undefined];
+  const vermelho: JogadorSorteio[] = [];
+  const azul: JogadorSorteio[] = [];
+  // Contagem de jogadores por posição em cada time, para distribuir DEF/MEI/ATA parelho.
+  const contagem: Record<"vermelho" | "azul", Record<string, number>> = { vermelho: {}, azul: {} };
+
+  for (const pos of grupos) {
+    const chave = pos ?? "_";
+    const grupo = jogadores.filter((j) => j.posicao === pos).sort((a, b) => b.nota - a.nota);
+    for (const j of grupo) {
+      const vCheio = vermelho.length >= limitePorTime;
+      const aCheio = azul.length >= limitePorTime;
+      const cv = contagem.vermelho[chave] ?? 0;
+      const ca = contagem.azul[chave] ?? 0;
+      let paraVermelho: boolean;
+      if (aCheio) paraVermelho = true;
+      else if (vCheio) paraVermelho = false;
+      else if (cv !== ca) paraVermelho = cv < ca; // primeiro equilibra a posição
+      else paraVermelho = somaNotas(vermelho) <= somaNotas(azul); // depois equilibra a nota
+      if (paraVermelho) {
+        vermelho.push(j);
+        contagem.vermelho[chave] = cv + 1;
+      } else {
+        azul.push(j);
+        contagem.azul[chave] = ca + 1;
+      }
+    }
+  }
+
+  const somaVermelho = somaNotas(vermelho);
+  const somaAzul = somaNotas(azul);
+  return {
+    vermelho,
+    azul,
+    somaVermelho,
+    somaAzul,
+    mediaVermelho: vermelho.length ? somaVermelho / vermelho.length : 0,
+    mediaAzul: azul.length ? somaAzul / azul.length : 0,
+  };
 }
 
 export function gerarRelatorioMensalistas(estado: Estado, mes: string, titulo: string) {

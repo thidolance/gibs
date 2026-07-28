@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gibs FC · Classificação, Rodadas e Ranking</title>
+  <link rel="icon" href="/gibs-logo.avif" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/gibs.css" />
+</head>
+<body data-page="publico">
+  <header data-gibs-masthead></header>
+
+  <main class="wrap">
+    <div class="tabs">
+      <button data-tab="classificacao" class="ativo">Classificação</button>
+      <button data-tab="rodadas">Rodadas</button>
+      <button data-tab="ranking">Ranking</button>
+    </div>
+    <div id="conteudo"><div class="estado"><div class="spinner"></div>Carregando dados do Gibs FC…</div></div>
+    <div class="rodape" id="updated" style="border:0"></div>
+  </main>
+
+  <footer class="rodape">Gibs FC · <a href="inicio.html">Início</a> · <a href="loja.html">Loja</a></footer>
+
+  <script src="/assets/gibs.js"></script>
+  <script>
+    let ESTADO = null;
+    const conteudo = document.getElementById("conteudo");
+    const G = () => window.GIBS;
+
+    function tagPos(pos) { return G().POS[pos] ? '<span class="tag ' + G().POS[pos].cls + '">' + G().POS[pos].abrev + "</span>" : ""; }
+    function legendaPos(fim) {
+      const itens = Object.keys(G().POS).map((k) => '<span><span class="tag ' + G().POS[k].cls + '">' + G().POS[k].abrev + "</span> " + G().POS[k].rotulo + "</span>").join("");
+      return '<div class="legenda">' + itens + '<span class="fim">' + fim + "</span></div>";
+    }
+    const badgePos = (i) => i === 0 ? "background:linear-gradient(135deg,#fbbf24,#d97706);color:#3a2500" : i === 1 ? "background:linear-gradient(135deg,#e2e8f0,#94a3b8);color:#1e293b" : i === 2 ? "background:linear-gradient(135deg,#e0a26a,#a15a1e);color:#fff" : "background:rgba(255,255,255,.1);color:rgba(255,255,255,.8)";
+    const accPos = (i) => i === 0 ? "background:var(--gold)" : i === 1 ? "background:rgba(255,255,255,.5)" : i === 2 ? "background:#c07a3a" : "background:var(--red)";
+    const delay = (i) => 'style="animation-delay:' + Math.min(i * 45, 600) + 'ms;';
+
+    function renderClassificacao(e) {
+      const lista = G().classificacao(e);
+      if (!lista.length) return '<div class="board"><div class="vazio">Nenhuma rodada registrada ainda.</div></div>';
+      const linhas = lista.map((l, i) =>
+        '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
+        '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
+        '<span class="nome">' + G().esc(l.jogador.nome) + " " + tagPos(l.jogador.posicao) + "</span>" +
+        '<span class="w-big pts">' + l.pontos + '</span><span class="w-num">' + l.v + '</span><span class="w-num">' + l.em + '</span><span class="w-num">' + l.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.j + "</span></div>"
+      ).join("");
+      return '<div class="board"><div class="meta">Gibs FC · ' + G().esc(G().nomeMes(e.mes)) + '</div><h2>Classificação <span>Mensal</span></h2>' +
+        '<div class="cols"><span style="width:28px;text-align:center;flex-shrink:0">#</span><span style="flex:1">Jogador</span><span class="w-big" style="color:var(--gold)">Pts</span><span class="w-num">V</span><span class="w-num">E</span><span class="w-num">D</span><span class="w-num">J</span></div>' +
+        linhas + legendaPos("Vitória = 3 pts · Empate = 1 pt") + "</div>";
+    }
+
+    function renderRanking(e) {
+      const lista = G().ranking(e);
+      if (!lista.length) return '<div class="board"><div class="vazio">Sem partidas registradas para gerar notas.</div></div>';
+      const linhas = lista.map((l, i) => {
+        const mov = l.mov > 0 ? '<span class="up">▲ ' + l.mov + "</span>" : l.mov < 0 ? '<span class="down">▼ ' + Math.abs(l.mov) + "</span>" : '<span class="flat">—</span>';
+        return '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
+          '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
+          '<span class="w-mov">' + mov + '</span><span class="nome">' + G().esc(l.jogador.nome) + " " + tagPos(l.jogador.posicao) + "</span>" +
+          '<span class="w-big pts">' + l.stats.nota.toFixed(1) + '</span><span class="w-num">' + l.stats.v + '</span><span class="w-num">' + l.stats.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.gols + "</span></div>";
+      }).join("");
+      return '<div class="board"><div class="meta">Gibs FC · Notas 5–10</div><h2>Ranking <span>Jogadores</span></h2>' +
+        '<div class="cols"><span style="width:28px;text-align:center;flex-shrink:0">#</span><span class="w-mov">Mov</span><span style="flex:1">Jogador</span><span class="w-big" style="color:var(--gold)">Nota</span><span class="w-num">V</span><span class="w-num">D</span><span class="w-num">G</span></div>' +
+        linhas + legendaPos("Vitória +0,1 · Derrota −0,2 · Gol +0,1") + "</div>";
+    }
+
+    function renderRodadas(e) {
+      const nome = (id) => { const j = e.jogadores.find((x) => x.id === id); return j ? j.nome : "—"; };
+      const rodadas = e.rodadas.filter((r) => r.resultado !== "andamento").sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+      if (!rodadas.length) return '<div class="board" style="background:transparent;border:0;box-shadow:none;padding:0"><div class="vazio">Nenhuma rodada disputada ainda.</div></div>';
+      const golsTime = (r, time) => time.reduce((s, id) => s + Number((r.gols || {})[id] || 0), 0);
+      const cards = rodadas.map((r, i) => {
+        const res = r.resultado === "vermelho" ? ["res-v", "Vermelho venceu", "venceu-v"] : r.resultado === "azul" ? ["res-a", "Azul venceu", "venceu-a"] : ["res-e", "Empate", ""];
+        const gv = golsTime(r, r.timeVermelho), ga = golsTime(r, r.timeAzul);
+        const lado = (time, cls, cor, titulo) => {
+          const itens = time.map((id) => { const g = Number((r.gols || {})[id] || 0); return "<li><span>" + G().esc(nome(id)) + "</span>" + (g > 0 ? '<span class="g">' + g + "⚽</span>" : "") + "</li>"; }).join("");
+          return '<div class="lado ' + cls + '"><b style="color:' + cor + '">' + titulo + "</b><ul>" + itens + "</ul></div>";
+        };
+        const placar =
+          '<div class="placar">' +
+          '<span class="lado-time v"><span class="dot v"></span>Vermelho</span>' +
+          '<span class="score"><span class="gv ' + (r.resultado === "vermelho" ? "venc" : "") + '">' + gv + '</span><span class="x">×</span><span class="ga ' + (r.resultado === "azul" ? "venc" : "") + '">' + ga + "</span></span>" +
+          '<span class="lado-time a">Azul<span class="dot a"></span></span></div>';
+        return '<div class="rodada ' + res[2] + '" ' + delay(i) + '">' +
+          '<div class="rodada-top"><span class="data">📅 ' + G().esc(G().dataExt(r.data)) + '</span><span class="res ' + res[0] + '">' + res[1] + "</span></div>" +
+          placar +
+          '<div class="times2">' + lado(r.timeVermelho, "lado-v", "var(--red-l)", "🔴 Vermelho") + lado(r.timeAzul, "lado-a", "var(--blue-l)", "🔵 Azul") + "</div></div>";
+      }).join("");
+      return '<div class="rodadas">' + cards + "</div>";
+    }
+
+    function render(tab) {
+      if (!ESTADO) return;
+      const html = tab === "rodadas" ? renderRodadas(ESTADO) : tab === "ranking" ? renderRanking(ESTADO) : renderClassificacao(ESTADO);
+      conteudo.innerHTML = '<div class="painel ativo">' + html + "</div>";
+    }
+
+    function irPara(tab) {
+      document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("ativo", b.dataset.tab === tab));
+      document.querySelectorAll(".masthead .link, .menu-mobile a").forEach((a) => a.classList.toggle("ativo", (a.getAttribute("href") || "").endsWith("#" + tab)));
+      if (location.hash.slice(1) !== tab) history.replaceState(null, "", "#" + tab);
+      render(tab);
+    }
+
+    document.querySelectorAll(".tabs button").forEach((btn) => btn.addEventListener("click", () => irPara(btn.dataset.tab)));
+    window.addEventListener("hashchange", () => { const t = location.hash.slice(1); if (["classificacao", "rodadas", "ranking"].includes(t)) irPara(t); });
+
+    GIBS.carregar().then((estado) => {
+      ESTADO = estado;
+      const inicial = ["classificacao", "rodadas", "ranking"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "classificacao";
+      irPara(inicial);
+      document.getElementById("updated").textContent = "Atualizado em " + new Date().toLocaleString("pt-BR");
+    }).catch(() => { conteudo.innerHTML = '<div class="estado">Não foi possível carregar os dados. Tente novamente mais tarde.</div>'; });
+  </script>
+</body>
+</html>

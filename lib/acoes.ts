@@ -77,18 +77,23 @@ export function removerJogador(estado: Estado, id: string): Estado {
     };
   }
 
-  const rodadas = estado.rodadas.map((r) => ({
-    ...r,
-    timeVermelho: (r.timeVermelho ?? []).filter((x) => x !== id),
-    timeAzul: (r.timeAzul ?? []).filter((x) => x !== id),
-  }));
+  const semJogadorNaRodada = (r: Rodada): Rodada => {
+    const { [id]: _omitido, ...gols } = r.gols ?? {};
+    return {
+      ...r,
+      timeVermelho: (r.timeVermelho ?? []).filter((x) => x !== id),
+      timeAzul: (r.timeAzul ?? []).filter((x) => x !== id),
+      gols,
+    };
+  };
 
   return {
     ...estado,
     jogadores: estado.jogadores.filter((j) => j.id !== id),
     mensalistasPorMes,
     jogosAvulsos,
-    rodadas,
+    rodadas: estado.rodadas.map(semJogadorNaRodada),
+    rodadasArquivadas: (estado.rodadasArquivadas ?? []).map(semJogadorNaRodada),
   };
 }
 
@@ -202,7 +207,13 @@ export function encerrarTrimestral(estado: Estado, periodo: string, data: string
     pontos: lider.pontos,
     data,
   };
-  return { ...estado, campeoes: [...estado.campeoes, campeao], rodadas: [] };
+  // Arquiva as rodadas do trimestral encerrado para manter a nota dos jogadores viva.
+  return {
+    ...estado,
+    campeoes: [...estado.campeoes, campeao],
+    rodadas: [],
+    rodadasArquivadas: [...(estado.rodadasArquivadas ?? []), ...estado.rodadas],
+  };
 }
 
 export function adicionarCampeao(estado: Estado, dados: Omit<CampeaoTrimestral, "id">): Estado {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { DollarSign, MapPin, Smartphone } from "lucide-react";
+import { AtSign, DollarSign, MapPin, Smartphone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,7 @@ export default function ConfiguracoesPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SecaoConfig icone={<DollarSign className="size-[15px]" />} titulo="Valores de cobrança">
             <div>
               <Label htmlFor="cfgValorMensal">Mensalidade</Label>
@@ -109,6 +109,25 @@ export default function ConfiguracoesPage() {
                 onChange={(e) => salvarCampo("horarioPadrao", e.target.value)}
               />
               <small className="mt-1 block text-[11.5px] text-muted-2">Sugerido ao criar um novo jogo avulso</small>
+            </div>
+          </SecaoConfig>
+
+          <SecaoConfig icone={<AtSign className="size-[15px]" />} titulo="Redes sociais">
+            <div>
+              <Label htmlFor="cfgInstagram">Instagram</Label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13px] font-bold text-muted">
+                  @
+                </span>
+                <Input
+                  id="cfgInstagram"
+                  className="pl-7"
+                  placeholder="gibsfc"
+                  value={cfg.instagram}
+                  onChange={(e) => salvarCampo("instagram", e.target.value.replace(/^@/, "").trim())}
+                />
+              </div>
+              <small className="mt-1 block text-[11.5px] text-muted-2">Exibido no painel público (só o usuário)</small>
             </div>
           </SecaoConfig>
         </div>
