@@ -188,6 +188,7 @@ main { padding: 34px 0 70px; }
 .row .posn { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; flex-shrink: 0; box-shadow: 0 3px 8px -3px rgba(0, 0, 0, .5); }
 .row .nome { flex: 1; font-weight: 800; text-transform: uppercase; letter-spacing: -.01em; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .tag { flex-shrink: 0; font-size: 9px; font-weight: 900; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; }
+.coroa { display: inline-block; width: 15px; height: 15px; margin: 0 3px -3px; color: var(--gold); filter: drop-shadow(0 0 5px rgba(245, 158, 11, .6)); }
 .w-mov { width: 46px; text-align: center; flex-shrink: 0; font-size: 11px; font-weight: 900; }
 .w-num { width: 30px; text-align: right; flex-shrink: 0; font-size: 14px; }
 .w-big { width: 54px; text-align: right; flex-shrink: 0; }

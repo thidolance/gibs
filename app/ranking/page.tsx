@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Download, Goal, Star, TrendingUp, Trophy } from "lucide-react";
+import { Crown, Download, Goal, Star, TrendingUp, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
@@ -94,9 +94,10 @@ export default function RankingPage() {
               Ranking de jogadores
             </CardTitle>
             <CardDescription>
-              Todos começam em <strong>6,0</strong>. Vitória <strong>+0,2</strong>, derrota <strong>−0,1</strong>, cada
-              gol <strong>+0,1</strong> e cada título de campeão <strong>+0,5</strong> — travado entre 5 e 10. O
-              movimento (▲▼) é em relação à rodada anterior.
+              Todos começam em <strong>6,0</strong>. Vitória <strong>+0,2</strong>, gol <strong>+0,1</strong>, título
+              de campeão <strong>+0,5</strong>, derrota <strong>−0,1</strong> e cada rodada que faltou desde a estreia{" "}
+              <strong>−0,1</strong> — travado entre <strong>6 e 10</strong> (quem some volta pra 6). O movimento (▲▼) é em
+              relação à rodada anterior.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
@@ -166,6 +167,12 @@ export default function RankingPage() {
                         <span className="truncate text-[15px] font-bold uppercase tracking-tight max-md:text-sm">
                           {linha.jogador.nome}
                         </span>
+                        {linha.titulos > 0 && (
+                          <Crown
+                            className="size-4 shrink-0 fill-gold text-gold drop-shadow-[0_0_6px_rgba(245,158,11,.6)]"
+                            aria-label={`${linha.titulos}x campeão`}
+                          />
+                        )}
                         {linha.jogador.posicao && (
                           <span
                             className={cn(
@@ -195,7 +202,7 @@ export default function RankingPage() {
                     {p.rotulo}
                   </span>
                 ))}
-                <span className="ml-auto normal-case tracking-normal text-white/35">Nota 5–10 · Gibs FC</span>
+                <span className="ml-auto normal-case tracking-normal text-white/35">Nota 6–10 · Gibs FC</span>
               </div>
             </div>
           )}

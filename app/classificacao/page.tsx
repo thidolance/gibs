@@ -38,7 +38,15 @@ import {
   removerCampeao,
   removerRodada,
 } from "@/lib/acoes";
-import { NOTA_BASE, classificacaoMensal, getMensalMes, notasJogadores, rodadasOrdenadas, sortearTimes } from "@/lib/calculos";
+import {
+  NOTA_BASE,
+  classificacaoMensal,
+  getMensalMes,
+  notasJogadores,
+  rodadasOrdenadas,
+  sortearTimes,
+  titulosPorJogador,
+} from "@/lib/calculos";
 import { calcularDiaSemana, cn, dataBR, hoje, nomeMes, tercaDaSemana } from "@/lib/utils";
 import type { CampeaoTrimestral, Jogador, Posicao, ResultadoRodada } from "@/lib/types";
 
@@ -84,14 +92,20 @@ export default function ClassificacaoPage() {
 
   const notas = notasJogadores(estado);
   const notaDe = (id: string) => notas.get(id)?.nota ?? NOTA_BASE;
+  const titulos = titulosPorJogador(estado);
+  const ehCampeao = (id: string) => (titulos.get(id) ?? 0) > 0;
 
   // Seleção de quem vai jogar a rodada. Enquanto o admin não mexe, usa os confirmados do mês.
   const confirmadosIds = new Set(confirmados.map((j) => j.id));
   const selecionados = selManual ?? confirmadosIds;
 
-  const porNota = (a: Jogador, b: Jogador) => notaDe(b.id) - notaDe(a.id) || a.nome.localeCompare(b.nome);
-  const timeVermelho = estado.jogadores.filter((j) => times[j.id] === "vermelho").sort(porNota);
-  const timeAzul = estado.jogadores.filter((j) => times[j.id] === "azul").sort(porNota);
+  // Ordena os times por posição (defensor → meio → atacante → sem) e, dentro de cada, por nota.
+  const ordemPos: Record<string, number> = { defensor: 0, meio: 1, atacante: 2 };
+  const ordP = (p?: Posicao) => (p ? ordemPos[p] : 3);
+  const porPosNota = (a: Jogador, b: Jogador) =>
+    ordP(a.posicao) - ordP(b.posicao) || notaDe(b.id) - notaDe(a.id) || a.nome.localeCompare(b.nome);
+  const timeVermelho = estado.jogadores.filter((j) => times[j.id] === "vermelho").sort(porPosNota);
+  const timeAzul = estado.jogadores.filter((j) => times[j.id] === "azul").sort(porPosNota);
   const sorteado = timeVermelho.length > 0 || timeAzul.length > 0;
 
   // Lista para o painel de seleção: confirmados primeiro, depois o resto.
@@ -204,7 +218,10 @@ export default function ClassificacaoPage() {
             {POS_ABREV[j.posicao]}
           </span>
         )}
-        <strong className="flex-1 truncate text-[13px]">{j.nome}</strong>
+        <strong className="flex flex-1 items-center gap-1 truncate text-[13px]">
+          <span className="truncate">{j.nome}</span>
+          {ehCampeao(j.id) && <Crown className="size-3 shrink-0 fill-gold text-gold" />}
+        </strong>
         <span className="shrink-0 text-[11px] font-bold text-muted">{notaDe(j.id).toFixed(1)}</span>
         <div className="flex shrink-0 items-center gap-0.5 rounded-sm border border-border-2 bg-white px-1 py-0.5">
           <button
@@ -463,8 +480,11 @@ export default function ClassificacaoPage() {
                       >
                         {i + 1}
                       </span>
-                      <span className="flex-1 truncate text-[15px] font-bold uppercase tracking-tight max-md:text-sm">
-                        {linha.jogador.nome}
+                      <span className="flex flex-1 items-center gap-1.5 truncate text-[15px] font-bold uppercase tracking-tight max-md:text-sm">
+                        <span className="truncate">{linha.jogador.nome}</span>
+                        {ehCampeao(linha.jogador.id) && (
+                          <Crown className="size-3.5 shrink-0 fill-gold text-gold drop-shadow-[0_0_5px_rgba(245,158,11,.6)]" />
+                        )}
                       </span>
                       <span className="w-9 text-right text-lg font-extrabold text-gold max-md:text-base">
                         {linha.pontos}

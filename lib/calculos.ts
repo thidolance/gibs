@@ -337,21 +337,30 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 // então ela sobrevive ao encerramento de um trimestral.
 
 export const NOTA_BASE = 6;
-export const NOTA_MIN = 5;
+export const NOTA_MIN = 6; // piso: a nota nunca baixa de 6
 export const NOTA_MAX = 10;
 export const PASSO_VITORIA = 0.2;
 export const PASSO_DERROTA = 0.1;
 export const PASSO_GOL = 0.1;
 export const PASSO_CAMPEAO = 0.5;
+export const PASSO_AUSENCIA = 0.1; // "ferrugem": perde por rodada que rolou depois da última vez que jogou
 
 function limitar(valor: number, min: number, max: number) {
   return Math.min(max, Math.max(min, valor));
 }
 
-/** Fórmula única da nota: base + vitórias/gols/títulos, menos derrotas, travada em [5, 10]. */
-function calcularNota(s: { vitorias: number; derrotas: number; gols: number }, campeonatos: number) {
+/** Fórmula única da nota: base + vitórias/gols/títulos, menos derrotas e ausências, travada em [6, 10]. */
+function calcularNota(
+  s: { vitorias: number; derrotas: number; gols: number; ausencias: number },
+  campeonatos: number,
+) {
   return limitar(
-    NOTA_BASE + s.vitorias * PASSO_VITORIA - s.derrotas * PASSO_DERROTA + s.gols * PASSO_GOL + campeonatos * PASSO_CAMPEAO,
+    NOTA_BASE +
+      s.vitorias * PASSO_VITORIA +
+      s.gols * PASSO_GOL +
+      campeonatos * PASSO_CAMPEAO -
+      s.derrotas * PASSO_DERROTA -
+      s.ausencias * PASSO_AUSENCIA,
     NOTA_MIN,
     NOTA_MAX,
   );
@@ -386,19 +395,27 @@ export interface EstatisticaJogador {
   empates: number;
   gols: number;
   jogos: number;
+  /** Rodadas que aconteceram depois da última vez que o jogador jogou. */
+  ausencias: number;
   nota: number;
 }
 
-/** Agrega vitórias/derrotas/empates/gols de uma lista de rodadas e calcula a nota. */
+/** Agrega vitórias/derrotas/empates/gols/ausências de uma lista de rodadas e calcula a nota. */
 export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, EstatisticaJogador> {
   const stats = new Map<string, EstatisticaJogador>();
   const garantir = (id: string) => {
-    if (!stats.has(id)) stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE });
+    if (!stats.has(id))
+      stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, ausencias: 0, nota: NOTA_BASE });
     return stats.get(id)!;
   };
 
-  for (const r of rodadas) {
-    if (r.resultado === "andamento") continue; // rodada sorteada ainda sem resultado
+  // Só rodadas com resultado, em ordem cronológica (para medir a ausência de quem parou de jogar).
+  const decididas = rodadas
+    .filter((r) => r.resultado !== "andamento")
+    .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
+
+  const primeiraRodada = new Map<string, number>();
+  decididas.forEach((r, idx) => {
     const times: [string[], boolean][] = [
       [r.timeVermelho ?? [], r.resultado === "vermelho"],
       [r.timeAzul ?? [], r.resultado === "azul"],
@@ -411,11 +428,15 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
         else if (venceu) s.vitorias++;
         else s.derrotas++;
         s.gols += Number(r.gols?.[id] ?? 0);
+        if (!primeiraRodada.has(id)) primeiraRodada.set(id, idx);
       }
     }
-  }
+  });
 
-  for (const s of stats.values()) {
+  const total = decididas.length;
+  for (const [id, s] of stats) {
+    // Ausências = rodadas que rolaram desde a estreia do jogador e que ele não jogou.
+    s.ausencias = total - (primeiraRodada.get(id) ?? 0) - s.jogos;
     s.nota = calcularNota(s, 0); // nota provisória (sem campeão); o bônus entra em notasComCampeoes
   }
   return stats;
@@ -425,9 +446,19 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
 function notasComCampeoes(estado: Estado, rodadas: Rodada[]): Map<string, EstatisticaJogador> {
   const stats = estatisticasPorRodadas(rodadas);
   const campeoes = campeonatosPorJogador(estado);
-  // Campeões que nunca jogaram uma rodada também entram (com o bônus).
+  const totalDecididas = rodadas.filter((r) => r.resultado !== "andamento").length;
+  // Campeão que nunca jogou nenhuma rodada conta como tendo faltado a todas (a nota cai da base + título).
   for (const id of campeoes.keys()) {
-    if (!stats.has(id)) stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE });
+    if (!stats.has(id))
+      stats.set(id, {
+        vitorias: 0,
+        derrotas: 0,
+        empates: 0,
+        gols: 0,
+        jogos: 0,
+        ausencias: totalDecididas,
+        nota: NOTA_BASE,
+      });
   }
   for (const [id, s] of stats) {
     s.nota = calcularNota(s, campeoes.get(id) ?? 0);
@@ -446,11 +477,18 @@ export interface LinhaRanking {
   posicaoAtual: number;
   /** + subiu, − caiu, 0 estável/novo desde a rodada anterior. */
   movimento: number;
+  /** Quantas vezes o jogador já foi campeão (mostra a coroa quando > 0). */
+  titulos: number;
+}
+
+/** Mapa público (id → nº de títulos) para exibir a coroa dos campeões em qualquer tela. */
+export function titulosPorJogador(estado: Estado): Map<string, number> {
+  return campeonatosPorJogador(estado);
 }
 
 /** Estatística do jogador ou o padrão (nota base, tudo zerado) para quem ainda não jogou. */
 function statOuPadrao(stats: Map<string, EstatisticaJogador>, id: string): EstatisticaJogador {
-  return stats.get(id) ?? { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE };
+  return stats.get(id) ?? { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, ausencias: 0, nota: NOTA_BASE };
 }
 
 /** Ordena TODOS os jogadores cadastrados por nota (desempate: gols, vitórias, nome). */
@@ -477,10 +515,18 @@ export function rankingJogadores(estado: Estado): LinhaRanking[] {
   const posicaoAnterior = new Map<string, number>();
   ordenarPorNota(estado, notasComCampeoes(estado, anterior)).forEach((j, i) => posicaoAnterior.set(j.id, i));
 
+  const titulos = campeonatosPorJogador(estado);
+
   return ordemAtual.map((jogador, i) => {
     const antes = posicaoAnterior.get(jogador.id);
     const movimento = antes === undefined ? 0 : antes - i; // subiu = posição menor agora
-    return { jogador, stats: statOuPadrao(statsAtual, jogador.id), posicaoAtual: i + 1, movimento };
+    return {
+      jogador,
+      stats: statOuPadrao(statsAtual, jogador.id),
+      posicaoAtual: i + 1,
+      movimento,
+      titulos: titulos.get(jogador.id) ?? 0,
+    };
   });
 }
 

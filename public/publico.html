@@ -42,10 +42,11 @@
     function renderClassificacao(e) {
       const lista = G().classificacao(e);
       if (!lista.length) return '<div class="board"><div class="vazio">Nenhuma rodada registrada ainda.</div></div>';
+      const camp = G().campeoesPorId(e);
       const linhas = lista.map((l, i) =>
         '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
         '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
-        '<span class="nome">' + G().esc(l.jogador.nome) + " " + tagPos(l.jogador.posicao) + "</span>" +
+        '<span class="nome">' + G().esc(l.jogador.nome) + G().coroa(camp, l.jogador.id) + " " + tagPos(l.jogador.posicao) + "</span>" +
         '<span class="w-big pts">' + l.pontos + '</span><span class="w-num">' + l.v + '</span><span class="w-num">' + l.em + '</span><span class="w-num">' + l.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.j + "</span></div>"
       ).join("");
       return '<div class="board"><div class="meta">Gibs FC · ' + G().esc(G().nomeMes(e.mes)) + '</div><h2>Classificação <span>Mensal</span></h2>' +
@@ -56,16 +57,17 @@
     function renderRanking(e) {
       const lista = G().ranking(e);
       if (!lista.length) return '<div class="board"><div class="vazio">Sem partidas registradas para gerar notas.</div></div>';
+      const camp = G().campeoesPorId(e);
       const linhas = lista.map((l, i) => {
         const mov = l.mov > 0 ? '<span class="up">▲ ' + l.mov + "</span>" : l.mov < 0 ? '<span class="down">▼ ' + Math.abs(l.mov) + "</span>" : '<span class="flat">—</span>';
         return '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
           '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
-          '<span class="w-mov">' + mov + '</span><span class="nome">' + G().esc(l.jogador.nome) + " " + tagPos(l.jogador.posicao) + "</span>" +
+          '<span class="w-mov">' + mov + '</span><span class="nome">' + G().esc(l.jogador.nome) + G().coroa(camp, l.jogador.id) + " " + tagPos(l.jogador.posicao) + "</span>" +
           '<span class="w-big pts">' + l.stats.nota.toFixed(1) + '</span><span class="w-num">' + l.stats.v + '</span><span class="w-num">' + l.stats.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.gols + "</span></div>";
       }).join("");
-      return '<div class="board"><div class="meta">Gibs FC · Notas 5–10</div><h2>Ranking <span>Jogadores</span></h2>' +
+      return '<div class="board"><div class="meta">Gibs FC · Notas 6–10</div><h2>Ranking <span>Jogadores</span></h2>' +
         '<div class="cols"><span style="width:28px;text-align:center;flex-shrink:0">#</span><span class="w-mov">Mov</span><span style="flex:1">Jogador</span><span class="w-big" style="color:var(--gold)">Nota</span><span class="w-num">V</span><span class="w-num">D</span><span class="w-num">G</span></div>' +
-        linhas + legendaPos("Vitória +0,2 · Derrota −0,1 · Gol +0,1 · Campeão +0,5") + "</div>";
+        linhas + legendaPos("Vitória +0,2 · Gol +0,1 · Campeão +0,5 · Derrota −0,1 · Faltou −0,1 · piso 6") + "</div>";
     }
 
     function renderRodadas(e) {

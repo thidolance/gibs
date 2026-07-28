@@ -4,7 +4,8 @@
   const DB_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/estado.json";
   const LOJA_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/loja.json";
 
-  const NOTA_BASE = 6, NOTA_MIN = 5, NOTA_MAX = 10, PV = 0.2, PD = 0.1, PG = 0.1, PCAMP = 0.5;
+  const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PV = 0.2, PD = 0.1, PG = 0.1, PCAMP = 0.5, PAUS = 0.1;
+  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.v * PV + s.gols * PG + (camp || 0) * PCAMP - s.d * PD - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
   const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
   const arr = (v) => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -65,25 +66,28 @@
   }
 
   function estatisticas(rodadas) {
-    const t = {}; const g = (id) => t[id] = t[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, nota: NOTA_BASE };
-    for (const r of rodadas) {
-      if (r.resultado === "andamento") continue;
+    const t = {}; const g = (id) => t[id] = t[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: 0, nota: NOTA_BASE };
+    const dec = rodadas.filter((r) => r.resultado !== "andamento").sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    const primeira = {};
+    dec.forEach((r, idx) => {
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([tm, w]) => {
-        for (const id of tm) { const x = g(id); x.j++; if (r.resultado === "empate") x.em++; else if (w) x.v++; else x.d++; x.gols += Number((r.gols || {})[id] || 0); }
+        for (const id of tm) { const x = g(id); x.j++; if (r.resultado === "empate") x.em++; else if (w) x.v++; else x.d++; x.gols += Number((r.gols || {})[id] || 0); if (primeira[id] === undefined) primeira[id] = idx; }
       });
-    }
-    for (const id in t) t[id].nota = limitar(NOTA_BASE + t[id].v * PV - t[id].d * PD + t[id].gols * PG, NOTA_MIN, NOTA_MAX);
+    });
+    const total = dec.length;
+    for (const id in t) { t[id].aus = total - primeira[id] - t[id].j; t[id].nota = notaCalc(t[id], 0); }
     return t;
   }
   // Estatísticas + bônus de campeão (+0,5 por título), recalculando a nota.
   function estatComCampeoes(e, rodadas) {
     const t = estatisticas(rodadas);
     const camp = campeoesPorId(e);
-    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = { v: 0, d: 0, em: 0, gols: 0, j: 0, nota: NOTA_BASE }; });
-    for (const id in t) t[id].nota = limitar(NOTA_BASE + t[id].v * PV - t[id].d * PD + t[id].gols * PG + (camp[id] || 0) * PCAMP, NOTA_MIN, NOTA_MAX);
+    const total = rodadas.filter((r) => r.resultado !== "andamento").length;
+    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: total, nota: NOTA_BASE }; });
+    for (const id in t) t[id].nota = notaCalc(t[id], camp[id] || 0);
     return t;
   }
-  const statPad = (st, id) => st[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, nota: NOTA_BASE };
+  const statPad = (st, id) => st[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: 0, nota: NOTA_BASE };
   // Todos os jogadores cadastrados entram no ranking (quem não jogou fica com a nota base).
   const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.gols - A.gols || B.v - A.v || a.nome.localeCompare(b.nome); });
 
@@ -180,9 +184,13 @@
   }
 
   // ── API pública ──
+  // Coroa dourada (SVG lucide) para os campeões.
+  const CROWN_SVG = '<svg class="coroa" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14" stroke-width="2" fill="none"/></svg>';
+  const coroa = (camp, id) => (camp[id] ? CROWN_SVG : "");
+
   window.GIBS = {
     DB_URL, LOJA_URL, esc, nomeMes, dataBR, dataExt, dinheiro, POS,
-    classificacao, ranking,
+    classificacao, ranking, campeoesPorId, coroa,
     carregar() {
       return fetch(DB_URL).then((r) => r.json()).then((d) => {
         const estado = normalizar(d);
