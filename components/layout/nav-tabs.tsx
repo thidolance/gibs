@@ -7,7 +7,7 @@ import { sair } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const ABAS = [
-  { href: "/", label: "Dashboard" },
+  { href: "/painel", label: "Dashboard" },
   { href: "/jogadores", label: "Jogadores" },
   { href: "/mensalistas", label: "Mensalistas" },
   { href: "/classificacao", label: "Classificação" },

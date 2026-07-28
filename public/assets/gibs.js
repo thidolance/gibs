@@ -98,7 +98,7 @@
     // A home não precisa da barra preta superior (já tem o hero); nas outras páginas ela aparece.
     const topbar = document.body.dataset.page === "inicio"
       ? ""
-      : '<div class="topbar"><div class="wrap"><span class="marca">⚽ Futebol de quarta</span><div class="socials">' + socialInsta + '<a href="/">Área do time</a></div></div></div>';
+      : '<div class="topbar"><div class="wrap"><span class="marca">Gibs FC</span><div class="socials">' + socialInsta + '<a href="/painel">Área do time</a></div></div></div>';
     el.innerHTML =
       topbar +
       '<div class="masthead"><div class="glow"></div><div class="wrap"><nav class="nav">' +
