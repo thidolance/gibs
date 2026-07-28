@@ -91,14 +91,16 @@
   function renderHeader(estado) {
     const el = document.querySelector("[data-gibs-masthead]");
     if (!el) return;
+    // A home é limpa: sem barra e sem menu (o hero e os cards já dão a navegação).
+    if (document.body.dataset.page === "inicio") {
+      el.innerHTML = "";
+      return;
+    }
     const insta = (estado.configuracoes.instagram || "").replace(/^@/, "");
     const ativa = chaveAtiva();
     const socialInsta = insta ? '<a href="https://instagram.com/' + esc(insta) + '" target="_blank" rel="noopener">' + iconInsta() + "@" + esc(insta) + "</a>" : "";
     const todos = NAV_ESQ.concat(NAV_DIR);
-    // A home não precisa da barra preta superior (já tem o hero); nas outras páginas ela aparece.
-    const topbar = document.body.dataset.page === "inicio"
-      ? ""
-      : '<div class="topbar"><div class="wrap"><span class="marca">Gibs FC</span><div class="socials">' + socialInsta + '<a href="/painel">Área do time</a></div></div></div>';
+    const topbar = '<div class="topbar"><div class="wrap"><span class="marca">Gibs FC</span><div class="socials">' + socialInsta + '<a href="/painel">Área do time</a></div></div></div>';
     el.innerHTML =
       topbar +
       '<div class="masthead"><div class="glow"></div><div class="wrap"><nav class="nav">' +

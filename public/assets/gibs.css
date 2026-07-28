@@ -44,7 +44,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ===== Barra superior (redes) ===== */
 .topbar {
-  background: rgba(0, 0, 0, .35);
+  background: linear-gradient(180deg, rgba(12, 20, 48, .72), rgba(8, 13, 32, .55));
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(6px);
 }
@@ -60,9 +60,10 @@ a { color: inherit; text-decoration: none; }
 .socials svg { width: 15px; height: 15px; }
 
 /* ===== Header / escudo central + menu ===== */
-.masthead { position: sticky; top: 0; z-index: 50; background: rgba(7, 13, 31, .82); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-.masthead .glow { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(40% 120% at 50% -20%, rgba(245, 158, 11, .22) 0%, transparent 70%); }
-.nav { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; height: 88px; }
+.masthead { position: sticky; top: 0; z-index: 50; background: linear-gradient(180deg, rgba(18, 28, 64, .92) 0%, rgba(9, 15, 36, .9) 100%); backdrop-filter: blur(14px); box-shadow: 0 10px 34px -16px rgba(0, 0, 0, .7); }
+.masthead::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #3b82f6 0%, #6d5bd0 50%, #ff2e2e 100%); opacity: .8; }
+.masthead .glow { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(45% 130% at 50% -25%, rgba(245, 158, 11, .20) 0%, transparent 72%); }
+.nav { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; height: 96px; }
 .nav .side { display: flex; gap: 4px; flex: 1; }
 .nav .side.esq { justify-content: flex-end; }
 .nav .side.dir { justify-content: flex-start; }
@@ -76,13 +77,13 @@ a { color: inherit; text-decoration: none; }
   content: ""; position: absolute; left: 14px; right: 14px; bottom: 2px; height: 2.5px; border-radius: 2px;
   background: linear-gradient(90deg, var(--gold), var(--gold-2));
 }
+/* Escudo solto (sem quadrado), maior e pulsando */
 .crest {
-  width: 84px; height: 84px; flex-shrink: 0; margin: 0 8px; border-radius: 20px; object-fit: contain; padding: 8px;
-  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04));
-  border: 2px solid var(--line-2); box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 40px rgba(245, 158, 11, .12);
-  transition: .25s;
+  width: 98px; height: 98px; flex-shrink: 0; margin: 0 14px; object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, .5)) drop-shadow(0 0 22px rgba(245, 158, 11, .32));
+  animation: pulseCrest 2.8s ease-in-out infinite; transition: filter .25s;
 }
-.crest:hover { transform: translateY(-2px) scale(1.03); }
+.crest:hover { filter: drop-shadow(0 10px 26px rgba(0, 0, 0, .6)) drop-shadow(0 0 40px rgba(245, 158, 11, .55)); }
 
 /* menu mobile: vira uma linha rolável */
 .menu-mobile { display: none; }
@@ -281,7 +282,7 @@ main { padding: 34px 0 70px; }
 
 /* ===== Hero (home) ===== */
 .hero { position: relative; text-align: center; padding: 28px 0 40px; }
-.hero .crestbig { position: relative; width: 132px; height: 132px; object-fit: contain; margin: 0 auto 18px; filter: drop-shadow(0 14px 44px rgba(59, 130, 246, .4)); animation: float 4s ease-in-out infinite; }
+.hero .crestbig { position: relative; width: 150px; height: 150px; object-fit: contain; margin: 0 auto 18px; filter: drop-shadow(0 14px 44px rgba(59, 130, 246, .4)) drop-shadow(0 0 26px rgba(245, 158, 11, .25)); animation: pulseCrest 2.8s ease-in-out infinite; }
 .hero .kicker { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .04); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
 .hero .kicker .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px var(--gold); }
 .hero h1 { font-size: 52px; font-weight: 900; letter-spacing: -.035em; line-height: 1; }
@@ -305,4 +306,5 @@ main { padding: 34px 0 70px; }
 @keyframes up { to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes pulseCrest { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } html { scroll-behavior: auto; } }
