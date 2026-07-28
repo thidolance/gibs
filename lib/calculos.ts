@@ -331,20 +331,53 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 }
 
 // ── Nota e ranking de jogadores ──────────────────────────────────────────────
-// Todos começam em NOTA_BASE (8). Cada vitória sobe, cada derrota desce e cada
-// gol soma um pouco — sempre travado no intervalo [NOTA_MIN, NOTA_MAX]. Empate é
-// neutro. A nota usa TODAS as rodadas já jogadas (atuais + arquivadas), então ela
-// sobrevive ao encerramento de um trimestral.
+// Todos começam em NOTA_BASE (6). Vitória e gols sobem, derrota desce e cada
+// título de campeão soma um bônus — sempre travado no intervalo [NOTA_MIN, NOTA_MAX].
+// Empate é neutro. A nota usa TODAS as rodadas já jogadas (atuais + arquivadas),
+// então ela sobrevive ao encerramento de um trimestral.
 
 export const NOTA_BASE = 6;
 export const NOTA_MIN = 5;
 export const NOTA_MAX = 10;
-export const PASSO_VITORIA = 0.1;
-export const PASSO_DERROTA = 0.2;
+export const PASSO_VITORIA = 0.2;
+export const PASSO_DERROTA = 0.1;
 export const PASSO_GOL = 0.1;
+export const PASSO_CAMPEAO = 0.5;
 
 function limitar(valor: number, min: number, max: number) {
   return Math.min(max, Math.max(min, valor));
+}
+
+/** Fórmula única da nota: base + vitórias/gols/títulos, menos derrotas, travada em [5, 10]. */
+function calcularNota(s: { vitorias: number; derrotas: number; gols: number }, campeonatos: number) {
+  return limitar(
+    NOTA_BASE + s.vitorias * PASSO_VITORIA - s.derrotas * PASSO_DERROTA + s.gols * PASSO_GOL + campeonatos * PASSO_CAMPEAO,
+    NOTA_MIN,
+    NOTA_MAX,
+  );
+}
+
+/** Nomes combinam se são iguais ou um é prefixo (por palavra) do outro — ex.: "Henrique" ~ "Henrique Muller". */
+function nomesCombinam(a: string, b: string): boolean {
+  a = a.trim().toLowerCase();
+  b = b.trim().toLowerCase();
+  return !!a && !!b && (a === b || a.startsWith(b + " ") || b.startsWith(a + " "));
+}
+
+/** Quantas vezes cada jogador foi campeão. O quadro guarda por nome; casamos com o id
+ *  de forma tolerante, só creditando quando há um único jogador correspondente. */
+function campeonatosPorJogador(estado: Estado): Map<string, number> {
+  const porId = new Map<string, number>();
+  for (const c of estado.campeoes) {
+    const nome = (c.jogadorNome ?? "").trim();
+    if (!nome) continue;
+    const candidatos = estado.jogadores.filter((j) => nomesCombinam(j.nome, nome));
+    if (candidatos.length === 1) {
+      const id = candidatos[0].id;
+      porId.set(id, (porId.get(id) ?? 0) + 1);
+    }
+  }
+  return porId;
 }
 
 export interface EstatisticaJogador {
@@ -383,18 +416,28 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
   }
 
   for (const s of stats.values()) {
-    s.nota = limitar(
-      NOTA_BASE + s.vitorias * PASSO_VITORIA - s.derrotas * PASSO_DERROTA + s.gols * PASSO_GOL,
-      NOTA_MIN,
-      NOTA_MAX,
-    );
+    s.nota = calcularNota(s, 0); // nota provisória (sem campeão); o bônus entra em notasComCampeoes
   }
   return stats;
 }
 
-/** Estatística/nota de cada jogador considerando rodadas atuais + arquivadas. */
+/** Aplica o bônus de campeão sobre as estatísticas de uma lista de rodadas. */
+function notasComCampeoes(estado: Estado, rodadas: Rodada[]): Map<string, EstatisticaJogador> {
+  const stats = estatisticasPorRodadas(rodadas);
+  const campeoes = campeonatosPorJogador(estado);
+  // Campeões que nunca jogaram uma rodada também entram (com o bônus).
+  for (const id of campeoes.keys()) {
+    if (!stats.has(id)) stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, nota: NOTA_BASE });
+  }
+  for (const [id, s] of stats) {
+    s.nota = calcularNota(s, campeoes.get(id) ?? 0);
+  }
+  return stats;
+}
+
+/** Estatística/nota de cada jogador considerando rodadas atuais + arquivadas + títulos. */
 export function notasJogadores(estado: Estado): Map<string, EstatisticaJogador> {
-  return estatisticasPorRodadas([...estado.rodadas, ...(estado.rodadasArquivadas ?? [])]);
+  return notasComCampeoes(estado, [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])]);
 }
 
 export interface LinhaRanking {
@@ -425,14 +468,14 @@ function ordenarPorNota(estado: Estado, stats: Map<string, EstatisticaJogador>):
  */
 export function rankingJogadores(estado: Estado): LinhaRanking[] {
   const todas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])];
-  const statsAtual = estatisticasPorRodadas(todas);
+  const statsAtual = notasComCampeoes(estado, todas);
   const ordemAtual = ordenarPorNota(estado, statsAtual);
 
   // Ranking anterior = sem a rodada mais recente (por data), para medir o movimento.
   const anterior = [...todas].sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
   anterior.pop();
   const posicaoAnterior = new Map<string, number>();
-  ordenarPorNota(estado, estatisticasPorRodadas(anterior)).forEach((j, i) => posicaoAnterior.set(j.id, i));
+  ordenarPorNota(estado, notasComCampeoes(estado, anterior)).forEach((j, i) => posicaoAnterior.set(j.id, i));
 
   return ordemAtual.map((jogador, i) => {
     const antes = posicaoAnterior.get(jogador.id);

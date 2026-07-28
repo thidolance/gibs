@@ -4,7 +4,7 @@
   const DB_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/estado.json";
   const LOJA_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/loja.json";
 
-  const NOTA_BASE = 6, NOTA_MIN = 5, NOTA_MAX = 10, PV = 0.1, PD = 0.2, PG = 0.1;
+  const NOTA_BASE = 6, NOTA_MIN = 5, NOTA_MAX = 10, PV = 0.2, PD = 0.1, PG = 0.1, PCAMP = 0.5;
   const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
   const arr = (v) => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -25,7 +25,25 @@
       rodadasArquivadas: arr(v.rodadasArquivadas).map(rod),
       mensalistasPorMes: v.mensalistasPorMes || {},
       configuracoes: v.configuracoes || {},
+      campeoes: arr(v.campeoes),
     };
+  }
+
+  // Nomes combinam se iguais ou um é prefixo (por palavra) do outro — ex.: "Henrique" ~ "Henrique Muller".
+  function nomesCombinam(a, b) {
+    a = (a || "").trim().toLowerCase(); b = (b || "").trim().toLowerCase();
+    return !!a && !!b && (a === b || a.startsWith(b + " ") || b.startsWith(a + " "));
+  }
+  // Quantas vezes cada jogador foi campeão, casando por nome de forma tolerante (correspondência única).
+  function campeoesPorId(e) {
+    const porId = {};
+    (e.campeoes || []).forEach((c) => {
+      const nome = (c.jogadorNome || "").trim();
+      if (!nome) return;
+      const cand = e.jogadores.filter((j) => nomesCombinam(j.nome, nome));
+      if (cand.length === 1) porId[cand[0].id] = (porId[cand[0].id] || 0) + 1;
+    });
+    return porId;
   }
 
   function confirmadosDoMes(e) {
@@ -57,15 +75,23 @@
     for (const id in t) t[id].nota = limitar(NOTA_BASE + t[id].v * PV - t[id].d * PD + t[id].gols * PG, NOTA_MIN, NOTA_MAX);
     return t;
   }
+  // Estatísticas + bônus de campeão (+0,5 por título), recalculando a nota.
+  function estatComCampeoes(e, rodadas) {
+    const t = estatisticas(rodadas);
+    const camp = campeoesPorId(e);
+    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = { v: 0, d: 0, em: 0, gols: 0, j: 0, nota: NOTA_BASE }; });
+    for (const id in t) t[id].nota = limitar(NOTA_BASE + t[id].v * PV - t[id].d * PD + t[id].gols * PG + (camp[id] || 0) * PCAMP, NOTA_MIN, NOTA_MAX);
+    return t;
+  }
   const statPad = (st, id) => st[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, nota: NOTA_BASE };
   // Todos os jogadores cadastrados entram no ranking (quem não jogou fica com a nota base).
   const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.gols - A.gols || B.v - A.v || a.nome.localeCompare(b.nome); });
 
   function ranking(e) {
     const todas = e.rodadas.concat(e.rodadasArquivadas);
-    const stA = estatisticas(todas); const ordem = ordenar(e, stA);
+    const stA = estatComCampeoes(e, todas); const ordem = ordenar(e, stA);
     const ant = todas.slice().sort((a, b) => (a.data || "").localeCompare(b.data || "")); ant.pop();
-    const pAnt = {}; ordenar(e, estatisticas(ant)).forEach((j, i) => pAnt[j.id] = i);
+    const pAnt = {}; ordenar(e, estatComCampeoes(e, ant)).forEach((j, i) => pAnt[j.id] = i);
     return ordem.map((j, i) => ({ jogador: j, stats: statPad(stA, j.id), pos: i + 1, mov: pAnt[j.id] === undefined ? 0 : pAnt[j.id] - i }));
   }
 

@@ -94,8 +94,9 @@ export default function RankingPage() {
               Ranking de jogadores
             </CardTitle>
             <CardDescription>
-              Todos começam em <strong>6,0</strong>. Vitória <strong>+0,1</strong>, derrota <strong>−0,2</strong> e cada
-              gol <strong>+0,1</strong> — travado entre 5 e 10. O movimento (▲▼) é em relação à rodada anterior.
+              Todos começam em <strong>6,0</strong>. Vitória <strong>+0,2</strong>, derrota <strong>−0,1</strong>, cada
+              gol <strong>+0,1</strong> e cada título de campeão <strong>+0,5</strong> — travado entre 5 e 10. O
+              movimento (▲▼) é em relação à rodada anterior.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
