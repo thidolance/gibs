@@ -24,7 +24,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 
 body {
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, Arial, sans-serif;
@@ -37,6 +37,7 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* nunca rolar na horizontal */
 }
 
 a { color: inherit; text-decoration: none; }
@@ -137,9 +138,10 @@ a { color: inherit; text-decoration: none; }
 /* painel de times da próxima rodada */
 .times-reveal { max-height: 0; overflow: hidden; transition: max-height .4s ease; }
 .times-reveal.aberto { max-height: 900px; }
-.times-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 0 4px; }
-@media (max-width: 560px) { .times-grid { grid-template-columns: 1fr; } }
-.time-col { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--card); }
+.times-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; padding: 14px 0 4px; }
+@media (max-width: 560px) { .times-grid { grid-template-columns: minmax(0, 1fr); } }
+.time-col { min-width: 0; border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--card); }
+.time-col li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .time-col.v { border-color: rgba(239, 68, 68, .35); }
 .time-col.a { border-color: rgba(59, 130, 246, .35); }
 .time-col h4 { font-size: 13px; margin-bottom: 8px; }
@@ -186,12 +188,17 @@ main { padding: 34px 0 70px; }
 .row.lider { background: linear-gradient(90deg, rgba(245, 158, 11, .18), rgba(245, 158, 11, .02)); box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .32); }
 .row .acc { width: 4px; height: 30px; border-radius: 99px; flex-shrink: 0; }
 .row .posn { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; flex-shrink: 0; box-shadow: 0 3px 8px -3px rgba(0, 0, 0, .5); }
-.row .nome { flex: 1; font-weight: 800; text-transform: uppercase; letter-spacing: -.01em; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .nome { flex: 1; min-width: 0; font-weight: 800; text-transform: uppercase; letter-spacing: -.01em; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .tag { flex-shrink: 0; font-size: 9px; font-weight: 900; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; }
 .coroa { display: inline-block; width: 15px; height: 15px; margin: 0 3px -3px; color: var(--gold); filter: drop-shadow(0 0 5px rgba(245, 158, 11, .6)); }
 .w-mov { width: 46px; text-align: center; flex-shrink: 0; font-size: 11px; font-weight: 900; }
 .w-num { width: 30px; text-align: right; flex-shrink: 0; font-size: 14px; }
 .w-big { width: 54px; text-align: right; flex-shrink: 0; }
+.w-seq { width: 48px; flex-shrink: 0; display: flex; justify-content: flex-end; }
+.seq-v, .seq-d { display: inline-flex; align-items: center; gap: 3px; font-weight: 900; font-size: 13px; }
+.seq-v { color: #fb923c; }
+.seq-d { color: #f87171; }
+.ic-seq { width: 13px; height: 13px; }
 .pts { font-size: 20px; font-weight: 900; color: var(--gold); text-shadow: 0 0 16px rgba(245, 158, 11, .35); }
 .up, .down, .flat { display: inline-block; padding: 2px 5px; border-radius: 6px; }
 .up { color: var(--green); background: rgba(74, 222, 128, .14); }
@@ -293,6 +300,22 @@ main { padding: 34px 0 70px; }
 /* brilho suave atrás do escudo */
 .hero::before { content: ""; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(59, 130, 246, .22), rgba(239, 68, 68, .12) 45%, transparent 70%); filter: blur(10px); z-index: -1; pointer-events: none; }
 @media (max-width: 560px) { .hero h1 { font-size: 38px; } }
+
+/* ===== Mobile: prioriza o NOME nas tabelas (esconde V/E/D/J e Mov) ===== */
+@media (max-width: 560px) {
+  .board { padding: 14px 10px; }
+  .board h2 { font-size: 20px; }
+  .cols { gap: 6px; padding: 0 4px 8px; font-size: 9px; }
+  .row { gap: 6px; padding: 8px 6px 8px 0; }
+  /* Só no celular: V/E/D/J e Mov saem, sobra tudo pro nome — fica # · Nome · Nota · Seq */
+  .w-num, .w-mov { display: none; }
+  .row .nome { font-size: 14px; }
+  .row .posn { width: 26px; height: 26px; font-size: 11px; }
+  .w-big { width: 42px; }
+  .w-seq { width: 40px; }
+  .pts { font-size: 18px; }
+  .coroa { width: 13px; height: 13px; }
+}
 
 /* ===== Estados / rodapé ===== */
 .estado { text-align: center; padding: 60px 20px; color: var(--muted); font-weight: 600; }

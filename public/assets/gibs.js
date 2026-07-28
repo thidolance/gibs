@@ -200,9 +200,14 @@
   const CROWN_SVG = '<svg class="coroa" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14" stroke-width="2" fill="none"/></svg>';
   const coroa = (camp, id) => (camp[id] ? CROWN_SVG : "");
 
+  // Sequência: chama (vitórias seguidas) ou seta pra baixo (derrotas seguidas).
+  const FLAME_SVG = '<svg class="ic-seq" viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>';
+  const DOWN_SVG = '<svg class="ic-seq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>';
+  const seqBadge = (s) => s.seq > 0 ? '<span class="seq-v">' + FLAME_SVG + s.seq + "</span>" : (s.seqD > 0 ? '<span class="seq-d">' + DOWN_SVG + s.seqD + "</span>" : '<span class="flat">—</span>');
+
   window.GIBS = {
     DB_URL, LOJA_URL, esc, nomeMes, dataBR, dataExt, dinheiro, POS,
-    classificacao, ranking, campeoesPorId, coroa,
+    classificacao, ranking, campeoesPorId, coroa, seqBadge,
     carregar() {
       return fetch(DB_URL).then((r) => r.json()).then((d) => {
         const estado = normalizar(d);

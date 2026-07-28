@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Crown, Download, Flame, Star, Trophy, Users } from "lucide-react";
+import { Crown, Download, Flame, Star, TrendingDown, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
@@ -193,11 +193,16 @@ export default function RankingPage() {
                       </span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.vitorias}</span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.derrotas}</span>
-                      <span className="w-12 text-right text-sm font-semibold">
+                      <span className="flex w-12 justify-end text-sm font-semibold">
                         {linha.stats.sequencia > 0 ? (
                           <span className="inline-flex items-center gap-0.5 text-[#fb923c]">
                             <Flame className="size-3.5" />
                             {linha.stats.sequencia}
+                          </span>
+                        ) : linha.stats.sequenciaDerrota > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 text-[#f87171]">
+                            <TrendingDown className="size-3.5" />
+                            {linha.stats.sequenciaDerrota}
                           </span>
                         ) : (
                           <span className="text-white/30">—</span>
