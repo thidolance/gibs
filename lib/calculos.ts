@@ -339,28 +339,27 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 export const NOTA_BASE = 6;
 export const NOTA_MIN = 6; // piso: a nota nunca baixa de 6
 export const NOTA_MAX = 10;
-export const PASSO_VITORIA = 0.2;
-export const PASSO_DERROTA = 0.1;
-export const PASSO_GOL = 0.1;
 export const PASSO_CAMPEAO = 0.5;
-export const PASSO_AUSENCIA = 0.1; // "ferrugem": perde por rodada que rolou depois da última vez que jogou
+export const PASSO_AUSENCIA = 0.1; // perde por rodada que rolou desde a estreia e não jogou
 
 function limitar(valor: number, min: number, max: number) {
   return Math.min(max, Math.max(min, valor));
 }
 
-/** Fórmula única da nota: base + vitórias/gols/títulos, menos derrotas e ausências, travada em [6, 10]. */
-function calcularNota(
-  s: { vitorias: number; derrotas: number; gols: number; ausencias: number },
-  campeonatos: number,
-) {
+/** Combo de vitória: a N-ésima seguida vale 0,2 / 0,3 / 0,4 ... (+0,1 a cada seguida, sem teto). */
+function pontosVitoriaSeguida(sequencia: number) {
+  return 0.1 * (sequencia + 1);
+}
+
+/** Combo de derrota: a N-ésima seguida tira 0,1 / 0,2 / 0,3 ... (+0,1 a cada seguida, sem teto). */
+function pontosDerrotaSeguida(sequencia: number) {
+  return 0.1 * sequencia;
+}
+
+/** Nota = base + combo de vitórias + títulos − combo de derrotas − ausências, travada em [6, 10]. */
+function calcularNota(s: { pontosVitoria: number; pontosDerrota: number; ausencias: number }, campeonatos: number) {
   return limitar(
-    NOTA_BASE +
-      s.vitorias * PASSO_VITORIA +
-      s.gols * PASSO_GOL +
-      campeonatos * PASSO_CAMPEAO -
-      s.derrotas * PASSO_DERROTA -
-      s.ausencias * PASSO_AUSENCIA,
+    NOTA_BASE + s.pontosVitoria + campeonatos * PASSO_CAMPEAO - s.pontosDerrota - s.ausencias * PASSO_AUSENCIA,
     NOTA_MIN,
     NOTA_MAX,
   );
@@ -393,50 +392,89 @@ export interface EstatisticaJogador {
   vitorias: number;
   derrotas: number;
   empates: number;
-  gols: number;
   jogos: number;
-  /** Rodadas que aconteceram depois da última vez que o jogador jogou. */
+  /** Rodadas que rolaram desde a estreia e o jogador não jogou. */
   ausencias: number;
+  /** Combo atual de vitórias seguidas (zera ao perder ou faltar). */
+  sequencia: number;
+  /** Combo atual de derrotas seguidas (zera ao vencer; falta NÃO zera). */
+  sequenciaDerrota: number;
+  /** Soma do combo de vitórias acumulado. */
+  pontosVitoria: number;
+  /** Soma do combo de derrotas acumulado (valor positivo, subtraído da nota). */
+  pontosDerrota: number;
   nota: number;
 }
 
-/** Agrega vitórias/derrotas/empates/gols/ausências de uma lista de rodadas e calcula a nota. */
+function novoStat(): EstatisticaJogador {
+  return {
+    vitorias: 0,
+    derrotas: 0,
+    empates: 0,
+    jogos: 0,
+    ausencias: 0,
+    sequencia: 0,
+    sequenciaDerrota: 0,
+    pontosVitoria: 0,
+    pontosDerrota: 0,
+    nota: NOTA_BASE,
+  };
+}
+
+/**
+ * Percorre as rodadas em ordem e apura, para cada jogador: vitórias/derrotas/empates,
+ * o combo de vitórias seguidas (empate mantém, derrota e falta zeram) e as ausências
+ * desde a estreia. Empate é neutro; gol não conta mais.
+ */
 export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, EstatisticaJogador> {
   const stats = new Map<string, EstatisticaJogador>();
-  const garantir = (id: string) => {
-    if (!stats.has(id))
-      stats.set(id, { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, ausencias: 0, nota: NOTA_BASE });
-    return stats.get(id)!;
-  };
+  const jaEstreou = new Set<string>();
 
-  // Só rodadas com resultado, em ordem cronológica (para medir a ausência de quem parou de jogar).
   const decididas = rodadas
     .filter((r) => r.resultado !== "andamento")
     .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
 
-  const primeiraRodada = new Map<string, number>();
-  decididas.forEach((r, idx) => {
+  for (const r of decididas) {
+    const presentes = new Set<string>([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]);
+
+    // Quem já estreou e não veio: falta. Tira 0,1 (ausência) e zera o combo de VITÓRIA,
+    // mas o combo de DERROTA continua (não zera).
+    for (const id of jaEstreou) {
+      if (!presentes.has(id)) {
+        const s = stats.get(id)!;
+        s.ausencias++;
+        s.sequencia = 0;
+      }
+    }
+
     const times: [string[], boolean][] = [
       [r.timeVermelho ?? [], r.resultado === "vermelho"],
       [r.timeAzul ?? [], r.resultado === "azul"],
     ];
     for (const [jogadores, venceu] of times) {
       for (const id of jogadores) {
-        const s = garantir(id);
+        if (!stats.has(id)) stats.set(id, novoStat());
+        jaEstreou.add(id);
+        const s = stats.get(id)!;
         s.jogos++;
-        if (r.resultado === "empate") s.empates++;
-        else if (venceu) s.vitorias++;
-        else s.derrotas++;
-        s.gols += Number(r.gols?.[id] ?? 0);
-        if (!primeiraRodada.has(id)) primeiraRodada.set(id, idx);
+        if (r.resultado === "empate") {
+          s.empates++; // empate é neutro: não zera nem soma nenhum combo
+        } else if (venceu) {
+          s.vitorias++;
+          s.sequencia++;
+          s.pontosVitoria += pontosVitoriaSeguida(s.sequencia); // 0,2 · 0,3 · 0,4 ...
+          s.sequenciaDerrota = 0; // vencer quebra a sequência de derrotas
+        } else {
+          s.derrotas++;
+          s.sequenciaDerrota++;
+          s.pontosDerrota += pontosDerrotaSeguida(s.sequenciaDerrota); // 0,1 · 0,2 · 0,3 ...
+          s.sequencia = 0; // perder quebra o combo de vitórias
+        }
       }
     }
-  });
+  }
 
-  const total = decididas.length;
-  for (const [id, s] of stats) {
-    // Ausências = rodadas que rolaram desde a estreia do jogador e que ele não jogou.
-    s.ausencias = total - (primeiraRodada.get(id) ?? 0) - s.jogos;
+  for (const s of stats.values()) {
     s.nota = calcularNota(s, 0); // nota provisória (sem campeão); o bônus entra em notasComCampeoes
   }
   return stats;
@@ -449,16 +487,7 @@ function notasComCampeoes(estado: Estado, rodadas: Rodada[]): Map<string, Estati
   const totalDecididas = rodadas.filter((r) => r.resultado !== "andamento").length;
   // Campeão que nunca jogou nenhuma rodada conta como tendo faltado a todas (a nota cai da base + título).
   for (const id of campeoes.keys()) {
-    if (!stats.has(id))
-      stats.set(id, {
-        vitorias: 0,
-        derrotas: 0,
-        empates: 0,
-        gols: 0,
-        jogos: 0,
-        ausencias: totalDecididas,
-        nota: NOTA_BASE,
-      });
+    if (!stats.has(id)) stats.set(id, { ...novoStat(), ausencias: totalDecididas });
   }
   for (const [id, s] of stats) {
     s.nota = calcularNota(s, campeoes.get(id) ?? 0);
@@ -488,7 +517,7 @@ export function titulosPorJogador(estado: Estado): Map<string, number> {
 
 /** Estatística do jogador ou o padrão (nota base, tudo zerado) para quem ainda não jogou. */
 function statOuPadrao(stats: Map<string, EstatisticaJogador>, id: string): EstatisticaJogador {
-  return stats.get(id) ?? { vitorias: 0, derrotas: 0, empates: 0, gols: 0, jogos: 0, ausencias: 0, nota: NOTA_BASE };
+  return stats.get(id) ?? novoStat();
 }
 
 /** Ordena TODOS os jogadores cadastrados por nota (desempate: gols, vitórias, nome). */
@@ -496,7 +525,7 @@ function ordenarPorNota(estado: Estado, stats: Map<string, EstatisticaJogador>):
   return [...estado.jogadores].sort((a, b) => {
     const sa = statOuPadrao(stats, a.id);
     const sb = statOuPadrao(stats, b.id);
-    return sb.nota - sa.nota || sb.gols - sa.gols || sb.vitorias - sa.vitorias || a.nome.localeCompare(b.nome);
+    return sb.nota - sa.nota || sb.vitorias - sa.vitorias || sb.sequencia - sa.sequencia || a.nome.localeCompare(b.nome);
   });
 }
 

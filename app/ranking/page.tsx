@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Crown, Download, Goal, Star, TrendingUp, Trophy } from "lucide-react";
+import { Crown, Download, Flame, Star, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
@@ -41,8 +41,7 @@ export default function RankingPage() {
 
   const ranking = rankingJogadores(estado);
   const lider = ranking[0];
-  const artilheiro = [...ranking].sort((a, b) => b.stats.gols - a.stats.gols)[0];
-  const totalGols = ranking.reduce((s, l) => s + l.stats.gols, 0);
+  const emSequencia = [...ranking].sort((a, b) => b.stats.sequencia - a.stats.sequencia)[0];
 
   async function baixarImagem() {
     if (!capturaRef.current) return;
@@ -71,18 +70,22 @@ export default function RankingPage() {
           icone={<Star />}
         />
         <MetricCard
-          titulo="Artilheiro"
-          valor={artilheiro && artilheiro.stats.gols > 0 ? artilheiro.jogador.nome : "—"}
-          legenda={artilheiro && artilheiro.stats.gols > 0 ? `${artilheiro.stats.gols} gol(s)` : "Nenhum gol registrado"}
+          titulo="Maior sequência"
+          valor={emSequencia && emSequencia.stats.sequencia > 0 ? emSequencia.jogador.nome : "—"}
+          legenda={
+            emSequencia && emSequencia.stats.sequencia > 0
+              ? `${emSequencia.stats.sequencia} vitória(s) seguida(s)`
+              : "Ninguém em sequência"
+          }
           variante="primary"
-          icone={<Goal />}
+          icone={<Flame />}
         />
         <MetricCard
-          titulo="Gols no total"
-          valor={String(totalGols)}
-          legenda={`${ranking.length} jogador(es) no ranking`}
+          titulo="No ranking"
+          valor={String(ranking.length)}
+          legenda={`${ranking.filter((l) => l.titulos > 0).length} campeão(ões)`}
           variante="blue"
-          icone={<TrendingUp />}
+          icone={<Users />}
         />
       </div>
 
@@ -94,10 +97,11 @@ export default function RankingPage() {
               Ranking de jogadores
             </CardTitle>
             <CardDescription>
-              Todos começam em <strong>6,0</strong>. Vitória <strong>+0,2</strong>, gol <strong>+0,1</strong>, título
-              de campeão <strong>+0,5</strong>, derrota <strong>−0,1</strong> e cada rodada que faltou desde a estreia{" "}
-              <strong>−0,1</strong> — travado entre <strong>6 e 10</strong> (quem some volta pra 6). O movimento (▲▼) é em
-              relação à rodada anterior.
+              Todos começam em <strong>6,0</strong>. Vitórias <strong>seguidas</strong> somam cada vez mais (
+              <strong>+0,2</strong>, +0,3, +0,4…) e derrotas <strong>seguidas</strong> tiram cada vez mais (
+              <strong>−0,1</strong>, −0,2, −0,3…). Título de campeão <strong>+0,5</strong>; faltar tira{" "}
+              <strong>−0,1</strong> (e zera o combo de vitória). Travado entre <strong>6 e 10</strong>. O movimento (▲▼) é
+              em relação à rodada anterior.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
@@ -131,7 +135,7 @@ export default function RankingPage() {
                 <span className="w-12 text-right text-gold">Nota</span>
                 <span className="w-7 text-right">V</span>
                 <span className="w-7 text-right">D</span>
-                <span className="w-7 text-right">G</span>
+                <span className="w-12 text-right">Seq</span>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -189,7 +193,16 @@ export default function RankingPage() {
                       </span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.vitorias}</span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.derrotas}</span>
-                      <span className="w-7 text-right text-sm font-semibold text-white/45">{linha.stats.gols}</span>
+                      <span className="w-12 text-right text-sm font-semibold">
+                        {linha.stats.sequencia > 0 ? (
+                          <span className="inline-flex items-center gap-0.5 text-[#fb923c]">
+                            <Flame className="size-3.5" />
+                            {linha.stats.sequencia}
+                          </span>
+                        ) : (
+                          <span className="text-white/30">—</span>
+                        )}
+                      </span>
                     </div>
                   );
                 })}

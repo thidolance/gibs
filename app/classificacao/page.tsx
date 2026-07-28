@@ -71,7 +71,6 @@ export default function ClassificacaoPage() {
   const [data, setData] = useState(tercaDaSemana());
   const [selManual, setSelManual] = useState<Set<string> | null>(null);
   const [times, setTimes] = useState<Record<string, Time>>({});
-  const [gols, setGols] = useState<Record<string, number>>({});
   const [resultado, setResultado] = useState<ResultadoRodada>("andamento");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
@@ -131,7 +130,6 @@ export default function ClassificacaoPage() {
   function limparSelecao() {
     setSelManual(new Set());
     setTimes({});
-    setGols({});
   }
 
   /** Sorteia os selecionados em dois times equilibrados por posição e nota. */
@@ -162,11 +160,6 @@ export default function ClassificacaoPage() {
       delete proximo[jogadorId];
       return proximo;
     });
-    setGols((atual) => {
-      const proximo = { ...atual };
-      delete proximo[jogadorId];
-      return proximo;
-    });
     setSelManual((atual) => {
       const base = new Set(atual ?? selecionados);
       base.delete(jogadorId);
@@ -178,7 +171,6 @@ export default function ClassificacaoPage() {
     setEditandoId(null);
     setSelManual(null);
     setTimes({});
-    setGols({});
     setResultado("andamento");
     setData(tercaDaSemana());
   }
@@ -190,24 +182,13 @@ export default function ClassificacaoPage() {
     setEditandoId(r.id);
     setSelManual(new Set([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]));
     setTimes(mapa);
-    setGols(r.gols ?? {});
     setResultado(r.resultado);
     setData(r.data);
     formularioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function definirGols(jogadorId: string, valor: number) {
-    setGols((atual) => {
-      const proximo = { ...atual };
-      if (valor > 0) proximo[jogadorId] = valor;
-      else delete proximo[jogadorId];
-      return proximo;
-    });
-  }
-
-  /** Uma linha de jogador dentro de um time: posição, nota, gols, trocar de lado e tirar de campo. */
+  /** Uma linha de jogador dentro de um time: posição, nota, trocar de lado e tirar de campo. */
   const linhaTime = (j: Jogador) => {
-    const g = gols[j.id] ?? 0;
     return (
       <div
         key={j.id}
@@ -223,27 +204,6 @@ export default function ClassificacaoPage() {
           {ehCampeao(j.id) && <Crown className="size-3 shrink-0 fill-gold text-gold" />}
         </strong>
         <span className="shrink-0 text-[11px] font-bold text-muted">{notaDe(j.id).toFixed(1)}</span>
-        <div className="flex shrink-0 items-center gap-0.5 rounded-sm border border-border-2 bg-white px-1 py-0.5">
-          <button
-            type="button"
-            aria-label="Menos um gol"
-            onClick={() => definirGols(j.id, g - 1)}
-            disabled={g <= 0}
-            className="flex size-5 items-center justify-center rounded-sm text-sm font-bold text-text-2 hover:bg-surface-2 disabled:opacity-40"
-          >
-            −
-          </button>
-          <span className="w-4 text-center text-[13px] font-extrabold tabular-nums">{g}</span>
-          <span className="text-xs">⚽</span>
-          <button
-            type="button"
-            aria-label="Mais um gol"
-            onClick={() => definirGols(j.id, g + 1)}
-            className="flex size-5 items-center justify-center rounded-sm text-sm font-bold text-text-2 hover:bg-surface-2"
-          >
-            +
-          </button>
-        </div>
         <button
           type="button"
           onClick={() => trocarTime(j.id)}
@@ -273,18 +233,11 @@ export default function ClassificacaoPage() {
       alert("Cada time precisa de pelo menos um jogador.");
       return;
     }
-    // Mantém apenas os gols de quem está escalado nesta rodada.
-    const escalados = new Set([...timeVermelho, ...timeAzul].map((j) => j.id));
-    const golsRodada: Record<string, number> = {};
-    for (const [id, qtd] of Object.entries(gols)) {
-      if (escalados.has(id) && qtd > 0) golsRodada[id] = qtd;
-    }
     const dados = {
       data,
       timeVermelho: timeVermelho.map((j) => j.id),
       timeAzul: timeAzul.map((j) => j.id),
       resultado,
-      gols: golsRodada,
     };
     if (editandoId) {
       const id = editandoId;
@@ -295,7 +248,6 @@ export default function ClassificacaoPage() {
       atualizarEstado((atual) => adicionarRodada(atual, dados));
       setSelManual(null);
       setTimes({});
-      setGols({});
       setResultado("andamento");
       alert(
         resultado === "andamento"
@@ -524,8 +476,7 @@ export default function ClassificacaoPage() {
             </CardTitle>
             <CardDescription>
               <span className="font-bold">Sorteie os times</span> (equilíbrio por posição e nota), ajuste manualmente se
-              quiser, marque os <span className="font-bold">gols</span> (contam no ranking), informe o resultado e{" "}
-              {editandoId ? "salve as alterações." : "registre."}
+              quiser, informe o resultado e {editandoId ? "salve as alterações." : "registre."}
             </CardDescription>
           </div>
           {editandoId && (

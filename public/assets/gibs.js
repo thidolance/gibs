@@ -4,9 +4,12 @@
   const DB_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/estado.json";
   const LOJA_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/loja.json";
 
-  const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PV = 0.2, PD = 0.1, PG = 0.1, PCAMP = 0.5, PAUS = 0.1;
-  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.v * PV + s.gols * PG + (camp || 0) * PCAMP - s.d * PD - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
+  const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PCAMP = 0.5, PAUS = 0.1;
   const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
+  const novoStat = () => ({ v: 0, d: 0, em: 0, j: 0, aus: 0, seq: 0, seqD: 0, pv: 0, pd: 0, nota: NOTA_BASE });
+  const comboV = (seq) => 0.1 * (seq + 1); // 0,2 · 0,3 · 0,4 ... por vitória seguida
+  const comboD = (seq) => 0.1 * seq;       // 0,1 · 0,2 · 0,3 ... por derrota seguida
+  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.pv + (camp || 0) * PCAMP - s.pd - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
   const arr = (v) => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -65,17 +68,26 @@
       .filter((x) => x.jogador).sort((a, b) => b.pontos - a.pontos || b.v - a.v || b.j - a.j || a.jogador.nome.localeCompare(b.jogador.nome));
   }
 
+  // Percorre as rodadas em ordem: apura V/D/E, combo de vitórias seguidas (empate mantém,
+  // derrota e falta zeram) e ausências desde a estreia. Gol não conta mais.
   function estatisticas(rodadas) {
-    const t = {}; const g = (id) => t[id] = t[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: 0, nota: NOTA_BASE };
+    const t = {}; const estreou = {};
     const dec = rodadas.filter((r) => r.resultado !== "andamento").sort((a, b) => (a.data || "").localeCompare(b.data || ""));
-    const primeira = {};
-    dec.forEach((r, idx) => {
+    for (const r of dec) {
+      const pres = {}; (r.timeVermelho || []).concat(r.timeAzul || []).forEach((id) => pres[id] = 1);
+      for (const id in estreou) { if (!pres[id]) { t[id].aus++; t[id].seq = 0; } }
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([tm, w]) => {
-        for (const id of tm) { const x = g(id); x.j++; if (r.resultado === "empate") x.em++; else if (w) x.v++; else x.d++; x.gols += Number((r.gols || {})[id] || 0); if (primeira[id] === undefined) primeira[id] = idx; }
+        (tm || []).forEach((id) => {
+          if (!t[id]) t[id] = novoStat();
+          estreou[id] = 1;
+          const x = t[id]; x.j++;
+          if (r.resultado === "empate") x.em++;
+          else if (w) { x.v++; x.seq++; x.pv += comboV(x.seq); x.seqD = 0; }
+          else { x.d++; x.seqD++; x.pd += comboD(x.seqD); x.seq = 0; }
+        });
       });
-    });
-    const total = dec.length;
-    for (const id in t) { t[id].aus = total - primeira[id] - t[id].j; t[id].nota = notaCalc(t[id], 0); }
+    }
+    for (const id in t) t[id].nota = notaCalc(t[id], 0);
     return t;
   }
   // Estatísticas + bônus de campeão (+0,5 por título), recalculando a nota.
@@ -83,13 +95,13 @@
     const t = estatisticas(rodadas);
     const camp = campeoesPorId(e);
     const total = rodadas.filter((r) => r.resultado !== "andamento").length;
-    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: total, nota: NOTA_BASE }; });
+    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = Object.assign(novoStat(), { aus: total }); });
     for (const id in t) t[id].nota = notaCalc(t[id], camp[id] || 0);
     return t;
   }
-  const statPad = (st, id) => st[id] || { v: 0, d: 0, em: 0, gols: 0, j: 0, aus: 0, nota: NOTA_BASE };
+  const statPad = (st, id) => st[id] || novoStat();
   // Todos os jogadores cadastrados entram no ranking (quem não jogou fica com a nota base).
-  const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.gols - A.gols || B.v - A.v || a.nome.localeCompare(b.nome); });
+  const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.v - A.v || B.seq - A.seq || a.nome.localeCompare(b.nome); });
 
   function ranking(e) {
     const todas = e.rodadas.concat(e.rodadasArquivadas);
