@@ -21,9 +21,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!montado) return null;
   if (autenticado) return <>{children}</>;
 
-  function tentarEntrar(e: React.FormEvent) {
+  async function tentarEntrar(e: React.FormEvent) {
     e.preventDefault();
-    if (entrar(senha)) {
+    if (await entrar(senha)) {
       setAutenticado(true);
     } else {
       setErro(true);
