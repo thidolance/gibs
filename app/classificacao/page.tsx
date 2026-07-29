@@ -288,7 +288,10 @@ export default function ClassificacaoPage() {
     if (periodo === null) return;
     if (
       !confirm(
-        `Campeão: ${lider.jogador.nome} (${lider.pontos} pts).\n\nEncerrar o trimestral e zerar a classificação para começar um novo?`,
+        `Campeão: ${lider.jogador.nome} (${lider.pontos} pts).\n\n` +
+          `A classificação de pontos zera para começar um novo trimestral.\n` +
+          `O ranking de jogadores (notas e sequências) NÃO é afetado — ele é vitalício.\n\n` +
+          `Encerrar o trimestral?`,
       )
     )
       return;
