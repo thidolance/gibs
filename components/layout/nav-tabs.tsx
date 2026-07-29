@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { ExternalLink, LogOut } from "lucide-react";
 import { sair } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -44,10 +44,19 @@ export function NavTabs() {
             </Link>
           );
         })}
+        <a
+          href="/inicio.html"
+          target="_blank"
+          rel="noopener"
+          title="Abrir o site público em nova aba"
+          className="ml-auto flex h-[46px] shrink-0 items-center gap-1.5 whitespace-nowrap px-4 text-[13px] font-semibold text-muted transition-colors hover:text-blue"
+        >
+          <ExternalLink className="size-4" /> Ver site público
+        </a>
         <button
           onClick={aoSair}
           title="Sair"
-          className="ml-auto flex h-[46px] shrink-0 items-center gap-1.5 whitespace-nowrap px-4 text-[13px] font-semibold text-muted transition-colors hover:text-red"
+          className="flex h-[46px] shrink-0 items-center gap-1.5 whitespace-nowrap px-4 text-[13px] font-semibold text-muted transition-colors hover:text-red"
         >
           <LogOut className="size-4" /> Sair
         </button>
