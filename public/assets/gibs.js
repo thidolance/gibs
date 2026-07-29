@@ -57,11 +57,13 @@
 
   function classificacao(e) {
     const st = {}; const gar = (id) => st[id] = st[id] || { pontos: 0, v: 0, em: 0, d: 0, j: 0 };
-    confirmadosDoMes(e).forEach(gar);
+    // Só mensalistas (confirmados do mês) entram na classificação; avulsos ficam de fora.
+    const mensalistas = new Set(confirmadosDoMes(e));
+    mensalistas.forEach(gar);
     for (const r of e.rodadas) {
       if (r.resultado === "andamento") continue;
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([t, w]) => {
-        for (const id of t) { const s = gar(id); s.j++; if (r.resultado === "empate") { s.em++; s.pontos += 1; } else if (w) { s.v++; s.pontos += 3; } else s.d++; }
+        for (const id of t) { if (!mensalistas.has(id)) continue; const s = gar(id); s.j++; if (r.resultado === "empate") { s.em++; s.pontos += 1; } else if (w) { s.v++; s.pontos += 3; } else s.d++; }
       });
     }
     return Object.entries(st).map(([id, s]) => ({ jogador: e.jogadores.find((j) => j.id === id), ...s }))

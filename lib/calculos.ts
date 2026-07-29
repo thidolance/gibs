@@ -289,8 +289,9 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
     return stats.get(id)!;
   };
 
-  // Todos os mensalistas confirmados entram na disputa, mesmo zerados.
-  getMensalMes(estado, estado.mes).confirmados.forEach(garantir);
+  // Só os mensalistas (confirmados do mês) disputam a classificação — avulsos ficam de fora.
+  const mensalistas = new Set(getMensalMes(estado, estado.mes).confirmados);
+  mensalistas.forEach(garantir);
 
   for (const r of estado.rodadas) {
     if (r.resultado === "andamento") continue; // ainda sem resultado: não pontua
@@ -300,6 +301,7 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
     ];
     for (const [jogadores, venceu] of times) {
       for (const id of jogadores) {
+        if (!mensalistas.has(id)) continue; // avulso não pontua no mensal
         const s = garantir(id);
         s.jogos++;
         if (r.resultado === "empate") {
