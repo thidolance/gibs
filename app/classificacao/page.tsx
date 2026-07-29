@@ -72,6 +72,8 @@ export default function ClassificacaoPage() {
   const [selManual, setSelManual] = useState<Set<string> | null>(null);
   const [times, setTimes] = useState<Record<string, Time>>({});
   const [resultado, setResultado] = useState<ResultadoRodada>("andamento");
+  const [placarV, setPlacarV] = useState("");
+  const [placarA, setPlacarA] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
   const carrosselRef = useRef<HTMLDivElement>(null);
@@ -172,6 +174,8 @@ export default function ClassificacaoPage() {
     setSelManual(null);
     setTimes({});
     setResultado("andamento");
+    setPlacarV("");
+    setPlacarA("");
     setData(tercaDaSemana());
   }
 
@@ -183,6 +187,8 @@ export default function ClassificacaoPage() {
     setSelManual(new Set([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]));
     setTimes(mapa);
     setResultado(r.resultado);
+    setPlacarV(r.placarVermelho?.toString() ?? "");
+    setPlacarA(r.placarAzul?.toString() ?? "");
     setData(r.data);
     formularioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -238,6 +244,8 @@ export default function ClassificacaoPage() {
       timeVermelho: timeVermelho.map((j) => j.id),
       timeAzul: timeAzul.map((j) => j.id),
       resultado,
+      ...(placarV !== "" ? { placarVermelho: Number(placarV) } : {}),
+      ...(placarA !== "" ? { placarAzul: Number(placarA) } : {}),
     };
     if (editandoId) {
       const id = editandoId;
@@ -249,6 +257,8 @@ export default function ClassificacaoPage() {
       setSelManual(null);
       setTimes({});
       setResultado("andamento");
+      setPlacarV("");
+      setPlacarA("");
       alert(
         resultado === "andamento"
           ? "Rodada sorteada e divulgada como próxima rodada. Edite depois para lançar o resultado."
@@ -582,6 +592,39 @@ export default function ClassificacaoPage() {
                   </div>
                 </div>
               )}
+
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                  Placar da partida <span className="font-normal normal-case">(opcional)</span>
+                </span>
+                <div className="flex items-center justify-center gap-4 py-1">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[11px] font-bold text-red">🔴 Vermelho</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={placarV}
+                      onChange={(e) => setPlacarV(e.target.value)}
+                      placeholder="0"
+                      className="h-14 w-20 rounded-md border-2 border-red/40 bg-white text-center text-2xl font-extrabold text-red outline-none focus:border-red focus:shadow-[0_0_0_3px_rgba(220,38,38,.18)]"
+                    />
+                  </div>
+                  <span className="mt-4 text-xl font-bold text-muted-2">×</span>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[11px] font-bold text-blue">🔵 Azul</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={placarA}
+                      onChange={(e) => setPlacarA(e.target.value)}
+                      placeholder="0"
+                      className="h-14 w-20 rounded-md border-2 border-blue-3/40 bg-white text-center text-2xl font-extrabold text-blue outline-none focus:border-blue-3 focus:shadow-[0_0_0_3px_rgba(59,130,246,.18)]"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Resultado</span>

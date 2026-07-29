@@ -77,15 +77,11 @@ export function removerJogador(estado: Estado, id: string): Estado {
     };
   }
 
-  const semJogadorNaRodada = (r: Rodada): Rodada => {
-    const { [id]: _omitido, ...gols } = r.gols ?? {};
-    return {
-      ...r,
-      timeVermelho: (r.timeVermelho ?? []).filter((x) => x !== id),
-      timeAzul: (r.timeAzul ?? []).filter((x) => x !== id),
-      gols,
-    };
-  };
+  const semJogadorNaRodada = (r: Rodada): Rodada => ({
+    ...r,
+    timeVermelho: (r.timeVermelho ?? []).filter((x) => x !== id),
+    timeAzul: (r.timeAzul ?? []).filter((x) => x !== id),
+  });
 
   return {
     ...estado,

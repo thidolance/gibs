@@ -203,14 +203,10 @@ export function normalizarEstado(valor: unknown): Estado {
     };
   }
 
-  const normalizarGols = (valor: unknown): Record<string, number> => {
-    if (!valor || typeof valor !== "object") return {};
-    const gols: Record<string, number> = {};
-    for (const [id, n] of Object.entries(valor as Record<string, unknown>)) {
-      const qtd = Number(n);
-      if (qtd > 0) gols[id] = qtd;
-    }
-    return gols;
+  const normalizarPlacar = (valor: unknown): number | undefined => {
+    if (valor === undefined || valor === null || valor === "") return undefined;
+    const n = Number(valor);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
   };
 
   const normalizarRodada = (r: Partial<Rodada> & Record<string, unknown>): Rodada => ({
@@ -219,7 +215,8 @@ export function normalizarEstado(valor: unknown): Estado {
     timeVermelho: normalizarArr<string>(r.timeVermelho),
     timeAzul: normalizarArr<string>(r.timeAzul),
     resultado: (r.resultado as Rodada["resultado"]) ?? "empate",
-    gols: normalizarGols(r.gols),
+    ...(normalizarPlacar(r.placarVermelho) !== undefined ? { placarVermelho: normalizarPlacar(r.placarVermelho) } : {}),
+    ...(normalizarPlacar(r.placarAzul) !== undefined ? { placarAzul: normalizarPlacar(r.placarAzul) } : {}),
   });
 
   const rodadas = normalizarArr<Partial<Rodada> & Record<string, unknown>>(v.rodadas).map(normalizarRodada);

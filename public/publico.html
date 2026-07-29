@@ -80,8 +80,17 @@
           const itens = time.map((id) => "<li><span>" + G().esc(nome(id)) + "</span></li>").join("");
           return '<div class="lado ' + cls + '"><b style="color:' + cor + '">' + titulo + "</b><ul>" + itens + "</ul></div>";
         };
+        // Placar por time (número vermelho pro Vermelho, azul pro Azul). Só mostra se foi registrado.
+        const temPlacar = r.placarVermelho !== null || r.placarAzul !== null;
+        const placar = temPlacar
+          ? '<div class="placar">' +
+            '<span class="lado-time v"><span class="dot v"></span>Vermelho</span>' +
+            '<span class="score"><span class="gv">' + (r.placarVermelho ?? 0) + '</span><span class="x">×</span><span class="ga">' + (r.placarAzul ?? 0) + "</span></span>" +
+            '<span class="lado-time a">Azul<span class="dot a"></span></span></div>'
+          : "";
         return '<div class="rodada ' + res[2] + '" ' + delay(i) + '">' +
           '<div class="rodada-top"><span class="data">📅 ' + G().esc(G().dataExt(r.data)) + '</span><span class="res ' + res[0] + '">' + res[1] + "</span></div>" +
+          placar +
           '<div class="times2">' + lado(r.timeVermelho, "lado-v", "var(--red-l)", "🔴 Vermelho") + lado(r.timeAzul, "lado-a", "var(--blue-l)", "🔵 Azul") + "</div></div>";
       }).join("");
       return '<div class="rodadas">' + cards + "</div>";

@@ -22,7 +22,8 @@
   function normalizar(v) {
     v = v || {};
     const jogadores = arr(v.jogadores).map((j) => ({ id: j.id, nome: j.nome || "", posicao: j.posicao }));
-    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), gols: r.gols || {} });
+    const plc = (x) => (x === undefined || x === null || x === "" ? null : Number(x));
+    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), placarVermelho: plc(r.placarVermelho), placarAzul: plc(r.placarAzul) });
     return {
       mes: v.mes, jogadores,
       rodadas: arr(v.rodadas).map(rod),

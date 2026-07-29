@@ -37,8 +37,9 @@ export interface Rodada {
   timeVermelho: string[];
   timeAzul: string[];
   resultado: ResultadoRodada;
-  /** Gols marcados por jogador nesta rodada (jogadorId → gols). Alimenta a nota. */
-  gols?: Record<string, number>;
+  /** Placar da partida por time (não influencia a nota, é só o registro do jogo). */
+  placarVermelho?: number;
+  placarAzul?: number;
 }
 
 export interface CampeaoTrimestral {
