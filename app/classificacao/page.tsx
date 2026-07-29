@@ -59,6 +59,13 @@ const POS_COR: Record<Posicao, string> = {
   atacante: "bg-red-light text-red",
 };
 
+// Tags de posição para fundo escuro (usadas no scoreboard baixável).
+const POS_TAG_DARK: Record<Posicao, string> = {
+  defensor: "bg-blue-3/25 text-blue-light",
+  meio: "bg-[#22c55e]/25 text-[#4ade80]",
+  atacante: "bg-red/30 text-red-light",
+};
+
 /** Sugere um rótulo de trimestre a partir do mês de referência (ex.: "3º Trimestre 2026"). */
 function sugestaoTrimestre(mes: string): string {
   const [ano, m] = mes.split("-").map(Number);
@@ -319,7 +326,7 @@ export default function ClassificacaoPage() {
     try {
       const url = await toPng(capturaRef.current, {
         pixelRatio: 3, // alta resolução para print nítido
-        backgroundColor: "#ffffff",
+        backgroundColor: "#0a1226",
         cacheBust: true,
       });
       const link = document.createElement("a");
@@ -388,15 +395,22 @@ export default function ClassificacaoPage() {
           ) : (
             <div
               ref={capturaRef}
-              className="overflow-hidden rounded-xl bg-[linear-gradient(165deg,#0a1730_0%,#0e2258_55%,#0a1730_100%)] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
+              className="relative overflow-hidden rounded-xl bg-[linear-gradient(180deg,rgba(12,20,46,.96),rgba(6,12,30,.96))] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
             >
+              {/* Barra de topo em gradiente (azul → vermelho), como no público */}
+              <div className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#3b82f6,#9333ea_50%,#ff2e2e)]" />
+
               {/* Cabeçalho estilo scoreboard */}
               <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-4">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-gold">Gibs FC</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-gold">
+                    Gibs FC · {nomeMes(mes).charAt(0) + nomeMes(mes).slice(1).toLowerCase()}
+                  </div>
                   <h2 className="text-2xl font-extrabold uppercase leading-none tracking-tight max-md:text-xl">
                     Classificação
-                    <span className="ml-2 text-gold">Mensal</span>
+                    <span className="ml-2 bg-[linear-gradient(100deg,#ff2e2e,#9333ea_60%,#3b82f6)] bg-clip-text text-transparent">
+                      Mensal
+                    </span>
                   </h2>
                 </div>
                 <span className="shrink-0 rounded-md bg-[#16a34a] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm">
@@ -429,14 +443,18 @@ export default function ClassificacaoPage() {
                     <div
                       key={linha.jogador.id}
                       className={cn(
-                        "flex items-center gap-3 rounded-md py-2 pr-2 pl-0 transition-colors",
-                        i < 3 ? "bg-white/[0.08]" : "bg-white/[0.03]",
+                        "flex items-center gap-3 rounded-md py-2 pr-2 pl-0",
+                        i === 0
+                          ? "bg-[linear-gradient(90deg,rgba(245,158,11,.18),rgba(245,158,11,.02))] shadow-[inset_0_0_0_1px_rgba(245,158,11,.32)]"
+                          : i < 3
+                            ? "bg-white/[0.08]"
+                            : "bg-white/[0.03]",
                       )}
                     >
                       <span className={cn("h-7 w-1 shrink-0 rounded-full", acento)} />
                       <span
                         className={cn(
-                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold",
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold shadow-[0_3px_8px_-3px_rgba(0,0,0,.5)]",
                           badge,
                         )}
                       >
@@ -447,8 +465,18 @@ export default function ClassificacaoPage() {
                         {ehCampeao(linha.jogador.id) && (
                           <Crown className="size-3.5 shrink-0 fill-gold text-gold drop-shadow-[0_0_5px_rgba(245,158,11,.6)]" />
                         )}
+                        {linha.jogador.posicao && (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider",
+                              POS_TAG_DARK[linha.jogador.posicao],
+                            )}
+                          >
+                            {POS_ABREV[linha.jogador.posicao]}
+                          </span>
+                        )}
                       </span>
-                      <span className="w-9 text-right text-lg font-extrabold text-gold max-md:text-base">
+                      <span className="w-9 text-right text-lg font-extrabold text-gold drop-shadow-[0_0_10px_rgba(245,158,11,.4)] max-md:text-base">
                         {linha.pontos}
                       </span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.vitorias}</span>
