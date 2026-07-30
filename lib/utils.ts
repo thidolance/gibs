@@ -65,6 +65,12 @@ export function dataBR(d: string | undefined | null) {
   return `${di}/${m}`;
 }
 
+export function dataBRCompleta(d: string | undefined | null) {
+  if (!d) return "";
+  const [a, m, di] = d.split("-");
+  return `${di}/${m}/${a}`;
+}
+
 const DIAS_SEMANA = [
   "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira",
   "Quinta-feira", "Sexta-feira", "Sábado",

@@ -14,7 +14,7 @@ import { useEstado } from "@/lib/estado-context";
 import { adicionarJogador, atualizarJogador, removerJogador, limparTudo } from "@/lib/acoes";
 import { POSICOES, type Jogador, type Posicao } from "@/lib/types";
 
-const FORM_VAZIO = { nome: "", apelido: "", telefone: "", posicao: "" as Posicao | "" };
+const FORM_VAZIO = { nome: "", apelido: "", telefone: "", posicao: "" as Posicao | "", numero: "" };
 
 const CORES_POSICAO: Record<Posicao, string> = {
   defensor: "bg-blue-light text-blue",
@@ -49,6 +49,7 @@ export default function JogadoresPage() {
       apelido: form.apelido.trim(),
       telefone: form.telefone.trim(),
       ...(form.posicao ? { posicao: form.posicao } : {}),
+      ...(form.numero.trim() ? { numero: form.numero.trim() } : {}),
     };
     if (editandoId) {
       if (!confirm("Confirmar alterações neste jogador?")) return;
@@ -66,6 +67,7 @@ export default function JogadoresPage() {
       apelido: jogador.apelido,
       telefone: jogador.telefone,
       posicao: jogador.posicao ?? "",
+      numero: jogador.numero ?? "",
     });
     setEditandoId(jogador.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -92,7 +94,7 @@ export default function JogadoresPage() {
           <CardDescription>Cadastre os jogadores do grupo para usá-los em mensalistas e avulsos.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <Label htmlFor="jNome">Nome</Label>
               <Input
@@ -106,9 +108,18 @@ export default function JogadoresPage() {
               <Label htmlFor="jApelido">Apelido</Label>
               <Input
                 id="jApelido"
-                placeholder="Apelido interno"
+                placeholder="Apelido / nome curto"
                 value={form.apelido}
                 onChange={(e) => setForm((f) => ({ ...f, apelido: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="jNumero">Número</Label>
+              <Input
+                id="jNumero"
+                placeholder="Ex.: 10"
+                value={form.numero}
+                onChange={(e) => setForm((f) => ({ ...f, numero: e.target.value }))}
               />
             </div>
             <div>
@@ -180,12 +191,13 @@ export default function JogadoresPage() {
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-blue-light text-[13px] font-extrabold text-blue">
-                          {(jogador.nome || "?").trim().charAt(0).toUpperCase()}
+                          {jogador.numero || (jogador.nome || "?").trim().charAt(0).toUpperCase()}
                         </span>
                         <div>
                           <strong className="block text-[13.5px]">{jogador.nome}</strong>
                           <small className="block text-xs text-muted">
                             {jogador.apelido ? `Apelido: ${jogador.apelido}` : "Sem apelido"}
+                            {jogador.numero ? ` · Nº ${jogador.numero}` : ""}
                           </small>
                         </div>
                       </div>

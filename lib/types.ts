@@ -6,6 +6,8 @@ export interface Jogador {
   apelido: string;
   telefone: string;
   posicao?: Posicao;
+  /** Número da camisa (texto livre p/ preservar "06", "2", etc.) — usado no card de time. */
+  numero?: string;
 }
 
 export const POSICOES: { valor: Posicao; rotulo: string; abrev: string }[] = [

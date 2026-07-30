@@ -247,12 +247,14 @@ export function normalizarEstado(valor: unknown): Estado {
   const POSICOES_VALIDAS: Posicao[] = ["defensor", "meio", "atacante"];
   const jogadores = normalizarArr<Partial<Jogador> & Record<string, unknown>>(v.jogadores).map((j) => {
     const posicao = POSICOES_VALIDAS.includes(j.posicao as Posicao) ? (j.posicao as Posicao) : undefined;
+    const numero = j.numero !== undefined && j.numero !== null && String(j.numero) !== "" ? String(j.numero) : undefined;
     return {
       id: (j.id as string) ?? gerarId(),
       nome: (j.nome as string) ?? "",
       apelido: (j.apelido as string) ?? "",
       telefone: (j.telefone as string) ?? "",
       ...(posicao ? { posicao } : {}),
+      ...(numero ? { numero } : {}),
     };
   });
 
