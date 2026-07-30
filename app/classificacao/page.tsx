@@ -10,6 +10,7 @@ import {
   Crown,
   Download,
   Flag,
+  ImageIcon,
   Medal,
   Pencil,
   Plus,
@@ -26,6 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EstadoLoading } from "@/components/layout/estado-loading";
+import { ElencoCard } from "@/components/cards/elenco-card";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PassoNumero, Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
@@ -83,9 +85,12 @@ export default function ClassificacaoPage() {
   const [placarA, setPlacarA] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
+  const [baixandoCard, setBaixandoCard] = useState<Time | null>(null);
   const carrosselRef = useRef<HTMLDivElement>(null);
   const capturaRef = useRef<HTMLDivElement>(null);
   const formularioRef = useRef<HTMLDivElement>(null);
+  const cardVermelhoRef = useRef<HTMLDivElement>(null);
+  const cardAzulRef = useRef<HTMLDivElement>(null);
 
   if (carregando) return <EstadoLoading />;
 
@@ -115,6 +120,10 @@ export default function ClassificacaoPage() {
   const timeVermelho = estado.jogadores.filter((j) => times[j.id] === "vermelho").sort(porPosNota);
   const timeAzul = estado.jogadores.filter((j) => times[j.id] === "azul").sort(porPosNota);
   const sorteado = timeVermelho.length > 0 || timeAzul.length > 0;
+
+  // Número de ordem da rodada (posição cronológica desta data entre todas já registradas).
+  const todasAsDatas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])].map((r) => r.data).filter(Boolean);
+  const numeroRodada = [...new Set([...todasAsDatas, data])].sort().indexOf(data) + 1;
 
   // Lista para o painel de seleção: confirmados primeiro, depois o resto.
   const jogadoresOrdenados = [...estado.jogadores].sort(
@@ -340,6 +349,23 @@ export default function ClassificacaoPage() {
       alert("Não foi possível gerar a imagem. Tente novamente.");
     } finally {
       setBaixando(false);
+    }
+  }
+
+  async function baixarCard(cor: Time) {
+    const ref = cor === "vermelho" ? cardVermelhoRef : cardAzulRef;
+    if (!ref.current) return;
+    setBaixandoCard(cor);
+    try {
+      const url = await toPng(ref.current, { pixelRatio: 2, cacheBust: true });
+      const link = document.createElement("a");
+      link.download = `elenco-${cor}-rodada-${numeroRodada}.png`;
+      link.href = url;
+      link.click();
+    } catch {
+      alert("Não foi possível gerar o card. Tente novamente.");
+    } finally {
+      setBaixandoCard(null);
     }
   }
 
@@ -620,6 +646,56 @@ export default function ClassificacaoPage() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-1.5">{timeAzul.map(linhaTime)}</div>
+                  </div>
+                </div>
+              )}
+
+              {sorteado && (
+                <div className="rounded-md border border-border bg-surface-2 p-3.5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <ImageIcon className="size-4 text-muted" />
+                    <strong className="text-[13px] font-bold text-text">Cards para o WhatsApp</strong>
+                    <span className="text-[11.5px] text-muted">— divulgue o elenco de cada time</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className="overflow-hidden rounded-lg border border-red/30 shadow-sm"
+                        style={{ width: 1080 * 0.28, height: 1350 * 0.28 }}
+                      >
+                        <div style={{ transform: "scale(0.28)", transformOrigin: "top left" }}>
+                          <div ref={cardVermelhoRef}>
+                            <ElencoCard cor="vermelho" jogadores={timeVermelho} data={data} numeroRodada={numeroRodada} />
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => baixarCard("vermelho")}
+                        disabled={baixandoCard !== null || timeVermelho.length === 0}
+                      >
+                        <Download /> {baixandoCard === "vermelho" ? "Gerando..." : "Baixar card Vermelho"}
+                      </Button>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div
+                        className="overflow-hidden rounded-lg border border-blue-3/30 shadow-sm"
+                        style={{ width: 1080 * 0.28, height: 1350 * 0.28 }}
+                      >
+                        <div style={{ transform: "scale(0.28)", transformOrigin: "top left" }}>
+                          <div ref={cardAzulRef}>
+                            <ElencoCard cor="azul" jogadores={timeAzul} data={data} numeroRodada={numeroRodada} />
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => baixarCard("azul")}
+                        disabled={baixandoCard !== null || timeAzul.length === 0}
+                      >
+                        <Download /> {baixandoCard === "azul" ? "Gerando..." : "Baixar card Azul"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
