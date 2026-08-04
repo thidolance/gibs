@@ -1,199 +1,152 @@
-import { Anton, Playfair_Display } from "next/font/google";
-import { Hand } from "lucide-react";
-import { dataBRCompleta } from "@/lib/utils";
+import { Crown, Flame, TrendingDown } from "lucide-react";
+import { POSICOES, type Posicao } from "@/lib/types";
+import { cn, dataBRCompleta } from "@/lib/utils";
 
-const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-anton" });
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["700"],
-  style: ["italic"],
-  variable: "--font-playfair",
-});
+const POS_ABREV: Record<Posicao, string> = { defensor: "DEF", meio: "MEI", atacante: "ATA" };
+const POS_COR: Record<Posicao, string> = {
+  defensor: "bg-blue-3/25 text-blue-3",
+  meio: "bg-[#22c55e]/25 text-[#4ade80]",
+  atacante: "bg-red/30 text-red-light",
+};
 
-export interface JogadorCard {
+export interface JogadorEscalado {
   id: string;
   nome: string;
   numero?: string;
+  posicao?: Posicao;
+  nota: number;
+  sequencia: number;
+  sequenciaDerrota: number;
+  campeao: boolean;
 }
 
 export interface ElencoCardProps {
   cor: "vermelho" | "azul";
-  jogadores: JogadorCard[];
+  jogadores: JogadorEscalado[];
   data: string;
   numeroRodada: number;
 }
 
 const TEMAS = {
   vermelho: {
-    nome: "RED",
-    acento: "#dc2626",
-    acentoEscuro: "#7f1d1d",
-    acentoClaro: "#f87171",
-    gradienteTexto: "linear-gradient(135deg, #f87171 0%, #dc2626 45%, #7f1d1d 100%)",
-    numeroMuted: "#9ca3af",
+    label: "Vermelho",
+    emoji: "🔴",
+    badgeBg: "bg-red",
+    gradienteTexto: "linear-gradient(100deg, #ff2e2e, #9333ea 60%, #3b82f6)",
+    acentoLinha: "bg-red",
   },
   azul: {
-    nome: "BLUE",
-    acento: "#2563eb",
-    acentoEscuro: "#1e3a8a",
-    acentoClaro: "#60a5fa",
-    gradienteTexto: "linear-gradient(135deg, #60a5fa 0%, #2563eb 45%, #1e3a8a 100%)",
-    numeroMuted: "#eab308",
+    label: "Azul",
+    emoji: "🔵",
+    badgeBg: "bg-blue",
+    gradienteTexto: "linear-gradient(100deg, #3b82f6, #9333ea 60%, #ff2e2e)",
+    acentoLinha: "bg-blue-3",
   },
 } as const;
 
-/** Textura leve de ruído (papel), gerada via SVG — mantém o card com um acabamento "fosco". */
-const GRAIN_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`;
-const GRAIN_URL = `url("data:image/svg+xml,${encodeURIComponent(GRAIN_SVG)}")`;
-
-/** Coluna de setas/chevrons decorativa nas laterais do card, apontando para a borda. */
-function ColunaChevron({ lado, cor }: { lado: "esquerda" | "direita"; cor: string }) {
-  const qtd = 10;
-  const apontaEsquerda = lado === "esquerda";
-  return (
-    <div
-      className="pointer-events-none absolute inset-y-0 flex flex-col justify-between py-3"
-      style={{
-        [lado === "esquerda" ? "left" : "right"]: 0,
-        width: 128,
-        [lado === "esquerda" ? "paddingLeft" : "paddingRight"]: 18,
-      }}
-    >
-      {/* Barra sólida na borda extrema */}
-      <div
-        className="absolute inset-y-0"
-        style={{ [lado === "esquerda" ? "left" : "right"]: 0, width: 26, background: cor }}
-      />
-      {Array.from({ length: qtd }).map((_, i) => (
-        <div
-          key={i}
-          style={{
-            height: 92,
-            width: 100,
-            clipPath: apontaEsquerda ? "polygon(100% 0%, 0% 50%, 100% 100%)" : "polygon(0% 0%, 100% 50%, 0% 100%)",
-            background: `linear-gradient(${apontaEsquerda ? "110deg" : "250deg"}, ${cor} 0%, ${cor}cc 55%, ${cor}88 100%)`,
-            filter: "drop-shadow(0 4px 6px rgba(0,0,0,.18))",
-          }}
-        />
-      ))}
-    </div>
-  );
+/** Selo de sequência: chama para combo de vitórias, seta pra baixo para combo de derrotas. */
+function Sequencia({ seq, seqD }: { seq: number; seqD: number }) {
+  if (seq > 0)
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[#fb923c]">
+        <Flame className="size-3.5" />
+        {seq}
+      </span>
+    );
+  if (seqD > 0)
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[#f87171]">
+        <TrendingDown className="size-3.5" />
+        {seqD}
+      </span>
+    );
+  return <span className="text-white/30">—</span>;
 }
 
-/** Card no estilo "poster" (Elenco Red/Blue) para divulgar a escalação da rodada — pronto para baixar como imagem. */
+/**
+ * Card de escalação no mesmo estilo "scoreboard" da Classificação/Ranking —
+ * pronto para baixar como imagem (via html-to-image) e divulgar no WhatsApp.
+ */
 export function ElencoCard({ cor, jogadores, data, numeroRodada }: ElencoCardProps) {
   const tema = TEMAS[cor];
 
   return (
-    <div
-      className={`${anton.variable} ${playfair.variable} relative overflow-hidden`}
-      style={{
-        width: 1080,
-        height: 1350,
-        background: "#efe9de",
-        fontFamily: "var(--font-anton)",
-      }}
-    >
-      {/* Textura de papel */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.35] mix-blend-multiply" style={{ backgroundImage: GRAIN_URL }} />
-
-      <ColunaChevron lado="esquerda" cor={tema.acento} />
-      <ColunaChevron lado="direita" cor={tema.acento} />
-
-      {/* Conteúdo central */}
-      <div className="absolute inset-0 flex flex-col items-center px-[140px] pt-[64px] text-center">
-        {/* Escudo + Mensal */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/gibs-logo.avif" alt="Gibs FC" width={118} height={118} style={{ objectFit: "contain" }} />
-        <div
-          className="mt-2 text-[34px] tracking-[0.05em]"
-          style={{
-            fontFamily: "var(--font-anton)",
-            background: "linear-gradient(135deg, #fde68a 0%, #d97706 55%, #92400e 100%)",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-          }}
-        >
-          MENSAL
+    <div className="w-full overflow-hidden rounded-xl bg-[linear-gradient(165deg,#0a1730_0%,#0e2258_55%,#0a1730_100%)] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)]">
+      {/* Cabeçalho estilo scoreboard */}
+      <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-gold">
+            Gibs FC · {numeroRodada}ª Rodada
+          </div>
+          <h2 className="text-2xl font-extrabold uppercase leading-none tracking-tight">
+            {tema.emoji} Time
+            <span
+              className="ml-2"
+              style={{
+                background: tema.gradienteTexto,
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              {tema.label}
+            </span>
+          </h2>
         </div>
-
-        {/* Título */}
-        <div
-          className="mt-8 text-[64px] leading-[0.95] tracking-[0.02em]"
-          style={{
-            fontFamily: "var(--font-anton)",
-            background: tema.gradienteTexto,
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-            textShadow: `4px 6px 0px ${tema.acentoEscuro}33`,
-          }}
+        <span
+          className={cn(
+            "shrink-0 rounded-md px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm",
+            tema.badgeBg,
+          )}
         >
-          ELENCO
-        </div>
-        <div
-          className="text-[128px] leading-[0.9] tracking-[0.01em]"
-          style={{
-            fontFamily: "var(--font-anton)",
-            transform: "skewX(-6deg)",
-            background: tema.gradienteTexto,
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-            textShadow: `6px 8px 0px ${tema.acentoEscuro}40`,
-          }}
-        >
-          {tema.nome}
-        </div>
+          {jogadores.length} escalados
+        </span>
+      </div>
 
-        {/* Elenco */}
-        <div className="mt-10 flex w-full flex-col items-center gap-[18px]">
-          {/* Goleiro (slot fixo, sem jogador vinculado) */}
-          <div className="flex items-center gap-4">
-            <Hand className="size-9" style={{ color: tema.numeroMuted, opacity: 0.75 }} />
-            <span className="text-[34px] font-bold" style={{ fontFamily: "var(--font-anton)", color: tema.acento }}>
-              GDA
+      {/* Cabeçalho das colunas */}
+      <div className="flex items-center gap-3 px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-white/45">
+        <span className="w-7 shrink-0 text-center">#</span>
+        <span className="flex-1">Jogador</span>
+        <span className="w-12 text-right text-gold">Nota</span>
+        <span className="w-12 text-right">Seq</span>
+      </div>
+
+      {/* Linhas */}
+      <div className="flex flex-col gap-1">
+        {jogadores.map((j, i) => (
+          <div key={j.id} className={cn("flex items-center gap-3 rounded-md py-2 pr-2 pl-0", "bg-white/[0.05]")}>
+            <span className={cn("h-7 w-1 shrink-0 rounded-full", tema.acentoLinha)} />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-extrabold text-white/80">
+              {j.numero || i + 1}
+            </span>
+            <span className="flex flex-1 items-center gap-1.5 truncate">
+              <span className="truncate text-[15px] font-bold uppercase tracking-tight">{j.nome}</span>
+              {j.campeao && (
+                <Crown className="size-3.5 shrink-0 fill-gold text-gold drop-shadow-[0_0_6px_rgba(245,158,11,.6)]" />
+              )}
+              {j.posicao && (
+                <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider", POS_COR[j.posicao])}>
+                  {POS_ABREV[j.posicao]}
+                </span>
+              )}
+            </span>
+            <span className="w-12 text-right text-lg font-extrabold text-gold">{j.nota.toFixed(1)}</span>
+            <span className="flex w-12 justify-end text-sm font-semibold">
+              <Sequencia seq={j.sequencia} seqD={j.sequenciaDerrota} />
             </span>
           </div>
+        ))}
+      </div>
 
-          {jogadores.map((j, i) => (
-            <div key={j.id} className="flex items-baseline gap-4">
-              <span
-                className="w-[60px] text-right text-[32px]"
-                style={{
-                  fontFamily: "var(--font-anton)",
-                  fontStyle: "italic",
-                  color: i % 2 === 0 ? tema.numeroMuted : tema.acento,
-                }}
-              >
-                {j.numero || "—"}
-              </span>
-              <span
-                style={{
-                  fontFamily: "var(--font-anton)",
-                  color: tema.acento,
-                  whiteSpace: "nowrap",
-                  fontSize: j.nome.length > 13 ? 26 : 34,
-                }}
-              >
-                {j.nome.toUpperCase()}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Rodapé: data + rodada */}
-        <div className="mt-auto mb-[54px] flex flex-col items-center gap-1">
-          <div className="flex items-baseline gap-2 text-[42px]" style={{ fontFamily: "var(--font-playfair)" }}>
-            <span className="italic font-bold" style={{ color: "#1e3a8a" }}>
-              {dataBRCompleta(data)}
-            </span>
-          </div>
-          <div className="text-[22px] tracking-[0.08em]" style={{ fontFamily: "var(--font-playfair)", color: tema.acentoEscuro }}>
-            {numeroRodada}ª RODADA
-          </div>
-        </div>
+      {/* Legenda */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-white/10 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-white/45">
+        {POSICOES.map((p) => (
+          <span key={p.valor} className="flex items-center gap-1.5">
+            <span className={cn("rounded px-1.5 py-0.5 text-[9px]", POS_COR[p.valor])}>{p.abrev}</span>
+            {p.rotulo}
+          </span>
+        ))}
+        <span className="ml-auto normal-case tracking-normal text-white/35">{dataBRCompleta(data)} · Gibs FC</span>
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EstadoLoading } from "@/components/layout/estado-loading";
-import { ElencoCard } from "@/components/cards/elenco-card";
+import { ElencoCard, type JogadorEscalado } from "@/components/cards/elenco-card";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PassoNumero, Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
@@ -109,6 +109,21 @@ export default function ClassificacaoPage() {
   const notaDe = (id: string) => notas.get(id)?.nota ?? NOTA_BASE;
   const titulos = titulosPorJogador(estado);
   const ehCampeao = (id: string) => (titulos.get(id) ?? 0) > 0;
+
+  /** Monta os dados de um jogador escalado para o card (nota, sequência, campeão). */
+  const paraEscalado = (j: Jogador): JogadorEscalado => {
+    const s = notas.get(j.id);
+    return {
+      id: j.id,
+      nome: j.nome,
+      numero: j.numero,
+      posicao: j.posicao,
+      nota: s?.nota ?? NOTA_BASE,
+      sequencia: s?.sequencia ?? 0,
+      sequenciaDerrota: s?.sequenciaDerrota ?? 0,
+      campeao: ehCampeao(j.id),
+    };
+  };
 
   // Seleção de quem vai jogar a rodada. Enquanto o admin não mexe, usa os confirmados do mês.
   const confirmadosIds = new Set(confirmados.map((j) => j.id));
@@ -731,19 +746,17 @@ export default function ClassificacaoPage() {
                   <div className="mb-3 flex items-center gap-2">
                     <ImageIcon className="size-4 text-muted" />
                     <strong className="text-[13px] font-bold text-text">Cards para o WhatsApp</strong>
-                    <span className="text-[11.5px] text-muted">— divulgue o elenco de cada time</span>
+                    <span className="text-[11.5px] text-muted">— divulgue o elenco de cada time, com nota e sequência</span>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div className="flex flex-col items-center gap-2">
-                      <div
-                        className="overflow-hidden rounded-lg border border-red/30 shadow-sm"
-                        style={{ width: 1080 * 0.28, height: 1350 * 0.28 }}
-                      >
-                        <div style={{ transform: "scale(0.28)", transformOrigin: "top left" }}>
-                          <div ref={cardVermelhoRef}>
-                            <ElencoCard cor="vermelho" jogadores={timeVermelho} data={data} numeroRodada={numeroRodada} />
-                          </div>
-                        </div>
+                      <div ref={cardVermelhoRef} className="w-full overflow-hidden rounded-lg shadow-sm">
+                        <ElencoCard
+                          cor="vermelho"
+                          jogadores={timeVermelho.map(paraEscalado)}
+                          data={data}
+                          numeroRodada={numeroRodada}
+                        />
                       </div>
                       <Button
                         variant="outline"
@@ -754,15 +767,13 @@ export default function ClassificacaoPage() {
                       </Button>
                     </div>
                     <div className="flex flex-col items-center gap-2">
-                      <div
-                        className="overflow-hidden rounded-lg border border-blue-3/30 shadow-sm"
-                        style={{ width: 1080 * 0.28, height: 1350 * 0.28 }}
-                      >
-                        <div style={{ transform: "scale(0.28)", transformOrigin: "top left" }}>
-                          <div ref={cardAzulRef}>
-                            <ElencoCard cor="azul" jogadores={timeAzul} data={data} numeroRodada={numeroRodada} />
-                          </div>
-                        </div>
+                      <div ref={cardAzulRef} className="w-full overflow-hidden rounded-lg shadow-sm">
+                        <ElencoCard
+                          cor="azul"
+                          jogadores={timeAzul.map(paraEscalado)}
+                          data={data}
+                          numeroRodada={numeroRodada}
+                        />
                       </div>
                       <Button
                         variant="outline"
