@@ -30,16 +30,14 @@ export interface ElencoCardProps {
 const TEMAS = {
   vermelho: {
     label: "Vermelho",
-    emoji: "🔴",
     badgeBg: "bg-red",
-    gradienteTexto: "linear-gradient(100deg, #ff2e2e, #9333ea 60%, #3b82f6)",
+    corTexto: "text-red",
     acentoLinha: "bg-red",
   },
   azul: {
     label: "Azul",
-    emoji: "🔵",
     badgeBg: "bg-blue",
-    gradienteTexto: "linear-gradient(100deg, #3b82f6, #9333ea 60%, #ff2e2e)",
+    corTexto: "text-blue-3",
     acentoLinha: "bg-blue-3",
   },
 } as const;
@@ -69,6 +67,7 @@ function Sequencia({ seq, seqD }: { seq: number; seqD: number }) {
  */
 export function ElencoCard({ cor, jogadores, data, numeroRodada }: ElencoCardProps) {
   const tema = TEMAS[cor];
+  const mediaNota = jogadores.length ? jogadores.reduce((s, j) => s + j.nota, 0) / jogadores.length : 0;
 
   return (
     <div className="w-full overflow-hidden rounded-xl bg-[linear-gradient(165deg,#0a1730_0%,#0e2258_55%,#0a1730_100%)] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)]">
@@ -79,28 +78,22 @@ export function ElencoCard({ cor, jogadores, data, numeroRodada }: ElencoCardPro
             Gibs FC · {numeroRodada}ª Rodada
           </div>
           <h2 className="text-2xl font-extrabold uppercase leading-none tracking-tight">
-            {tema.emoji} Time
-            <span
-              className="ml-2"
-              style={{
-                background: tema.gradienteTexto,
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              {tema.label}
-            </span>
+            Time <span className={tema.corTexto}>{tema.label}</span>
           </h2>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-md px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm",
-            tema.badgeBg,
-          )}
-        >
-          {jogadores.length} escalados
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="text-3xl font-extrabold leading-none text-gold drop-shadow-[0_0_10px_rgba(245,158,11,.4)]">
+            {mediaNota.toFixed(1)}
+          </span>
+          <span
+            className={cn(
+              "rounded-md px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm",
+              tema.badgeBg,
+            )}
+          >
+            {jogadores.length} escalados
+          </span>
+        </div>
       </div>
 
       {/* Cabeçalho das colunas */}
