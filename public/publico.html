@@ -63,11 +63,11 @@
         return '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
           '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
           '<span class="w-mov">' + mov + '</span><span class="nome">' + G().esc(l.jogador.nome) + G().coroa(camp, l.jogador.id) + " " + tagPos(l.jogador.posicao) + "</span>" +
-          '<span class="w-big pts">' + l.stats.nota.toFixed(1) + '</span><span class="w-num">' + l.stats.v + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.d + '</span><span class="w-seq">' + G().seqBadge(l.stats) + "</span></div>";
+          '<span class="w-big pts">' + l.stats.nota.toFixed(1) + '</span><span class="w-num">' + l.stats.v + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.gols + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.assist + '</span><span class="w-seq">' + G().seqBadge(l.stats) + "</span></div>";
       }).join("");
       return '<div class="board"><div class="meta">Gibs FC · Notas 6–10</div><h2>Ranking <span>Jogadores</span></h2>' +
-        '<div class="cols"><span style="width:28px;text-align:center;flex-shrink:0">#</span><span class="w-mov">Mov</span><span style="flex:1">Jogador</span><span class="w-big" style="color:var(--gold)">Nota</span><span class="w-num">V</span><span class="w-num">D</span><span class="w-seq">Seq</span></div>' +
-        linhas + legendaPos("Vitórias seguidas +0,2/+0,3/+0,4… · Derrotas seguidas −0,1/−0,2… · Campeão +0,5 · Faltou −0,1 · piso 6") + "</div>";
+        '<div class="cols"><span style="width:28px;text-align:center;flex-shrink:0">#</span><span class="w-mov">Mov</span><span style="flex:1">Jogador</span><span class="w-big" style="color:var(--gold)">Nota</span><span class="w-num">V</span><span class="w-num">D</span><span class="w-num">G</span><span class="w-num">A</span><span class="w-seq">Seq</span></div>' +
+        linhas + legendaPos("Vitórias seguidas +0,2/+0,3/+0,4… · Derrotas seguidas −0,1/−0,2… · Gol e assistência +0,05 · Campeão +0,5 · Faltou −0,1 · piso 6") + "</div>";
     }
 
     function renderRodadas(e) {

@@ -81,6 +81,8 @@ export default function ClassificacaoPage() {
   const [resultado, setResultado] = useState<ResultadoRodada>("andamento");
   const [placarV, setPlacarV] = useState("");
   const [placarA, setPlacarA] = useState("");
+  const [gols, setGols] = useState<Record<string, number>>({});
+  const [assistencias, setAssistencias] = useState<Record<string, number>>({});
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [baixando, setBaixando] = useState(false);
   const carrosselRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,8 @@ export default function ClassificacaoPage() {
     setResultado("andamento");
     setPlacarV("");
     setPlacarA("");
+    setGols({});
+    setAssistencias({});
     setData(tercaDaSemana());
   }
 
@@ -196,43 +200,107 @@ export default function ClassificacaoPage() {
     setResultado(r.resultado);
     setPlacarV(r.placarVermelho?.toString() ?? "");
     setPlacarA(r.placarAzul?.toString() ?? "");
+    setGols(r.gols ?? {});
+    setAssistencias(r.assistencias ?? {});
     setData(r.data);
     formularioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  /** Uma linha de jogador dentro de um time: posição, nota, trocar de lado e tirar de campo. */
-  const linhaTime = (j: Jogador) => {
+  function definirGol(id: string, valor: number) {
+    setGols((atual) => {
+      const proximo = { ...atual };
+      if (valor > 0) proximo[id] = valor;
+      else delete proximo[id];
+      return proximo;
+    });
+  }
+
+  function definirAssistencia(id: string, valor: number) {
+    setAssistencias((atual) => {
+      const proximo = { ...atual };
+      if (valor > 0) proximo[id] = valor;
+      else delete proximo[id];
+      return proximo;
+    });
+  }
+
+  /** Contador compacto (−/valor/+) usado para gols e assistências de cada jogador escalado. */
+  function Contador({ valor, onChange, titulo, rotulo }: { valor: number; onChange: (v: number) => void; titulo: string; rotulo: string }) {
     return (
       <div
-        key={j.id}
-        className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-1.5"
+        className="flex shrink-0 items-center gap-0.5 rounded-sm border border-border-2 bg-white px-1 py-0.5"
+        title={titulo}
       >
-        {j.posicao && (
-          <span className={cn("shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold", POS_COR[j.posicao])}>
-            {POS_ABREV[j.posicao]}
-          </span>
-        )}
-        <strong className="flex flex-1 items-center gap-1 truncate text-[13px]">
-          <span className="truncate">{j.nome}</span>
-          {ehCampeao(j.id) && <Crown className="size-3 shrink-0 fill-gold text-gold" />}
-        </strong>
-        <span className="shrink-0 text-[11px] font-bold text-muted">{notaDe(j.id).toFixed(1)}</span>
         <button
           type="button"
-          onClick={() => trocarTime(j.id)}
-          title="Trocar de time"
-          className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface-2 hover:text-blue"
+          aria-label={`Menos ${titulo.toLowerCase()}`}
+          onClick={() => onChange(valor - 1)}
+          disabled={valor <= 0}
+          className="flex size-4 items-center justify-center rounded-sm text-[11px] font-bold text-text-2 hover:bg-surface-2 disabled:opacity-40"
         >
-          <ArrowLeftRight className="size-3.5" />
+          −
         </button>
+        <span className="flex w-8 items-center justify-center gap-0.5 text-[10.5px] font-extrabold tabular-nums text-text-2">
+          <span className="text-[9px] font-black text-muted-2">{rotulo}</span>
+          {valor}
+        </span>
         <button
           type="button"
-          onClick={() => removerDoTime(j.id)}
-          title="Tirar de campo"
-          className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-danger-bg hover:text-danger"
+          aria-label={`Mais ${titulo.toLowerCase()}`}
+          onClick={() => onChange(valor + 1)}
+          className="flex size-4 items-center justify-center rounded-sm text-[11px] font-bold text-text-2 hover:bg-surface-2"
         >
-          <X className="size-3.5" />
+          +
         </button>
+      </div>
+    );
+  }
+
+  /** Uma linha de jogador dentro de um time: nome/nota em cima, gol/assistência e ações embaixo. */
+  const linhaTime = (j: Jogador) => {
+    return (
+      <div key={j.id} className="flex flex-col gap-1.5 rounded-sm border border-border bg-surface px-2.5 py-2">
+        <div className="flex items-center gap-2">
+          {j.posicao && (
+            <span className={cn("shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold", POS_COR[j.posicao])}>
+              {POS_ABREV[j.posicao]}
+            </span>
+          )}
+          <strong className="flex flex-1 items-center gap-1 truncate text-[13px]">
+            <span className="truncate">{j.nome}</span>
+            {ehCampeao(j.id) && <Crown className="size-3 shrink-0 fill-gold text-gold" />}
+          </strong>
+          <span className="shrink-0 text-[11px] font-bold text-muted">{notaDe(j.id).toFixed(1)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Contador valor={gols[j.id] ?? 0} onChange={(v) => definirGol(j.id, v)} titulo="Gols" rotulo="G" />
+            <Contador
+              valor={assistencias[j.id] ?? 0}
+              onChange={(v) => definirAssistencia(j.id, v)}
+              titulo="Assistências"
+              rotulo="A"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => trocarTime(j.id)}
+              title="Trocar de time"
+              className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-surface-2 hover:text-blue"
+            >
+              <ArrowLeftRight className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => removerDoTime(j.id)}
+              title="Tirar de campo"
+              className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted hover:bg-danger-bg hover:text-danger"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -246,6 +314,10 @@ export default function ClassificacaoPage() {
       alert("Cada time precisa de pelo menos um jogador.");
       return;
     }
+    // Mantém apenas gols/assistências de quem está escalado nesta rodada.
+    const escalados = new Set([...timeVermelho, ...timeAzul].map((j) => j.id));
+    const filtrar = (mapa: Record<string, number>) =>
+      Object.fromEntries(Object.entries(mapa).filter(([id, qtd]) => escalados.has(id) && qtd > 0));
     const dados = {
       data,
       timeVermelho: timeVermelho.map((j) => j.id),
@@ -253,6 +325,8 @@ export default function ClassificacaoPage() {
       resultado,
       ...(placarV !== "" ? { placarVermelho: Number(placarV) } : {}),
       ...(placarA !== "" ? { placarAzul: Number(placarA) } : {}),
+      gols: filtrar(gols),
+      assistencias: filtrar(assistencias),
     };
     if (editandoId) {
       const id = editandoId;
@@ -266,6 +340,8 @@ export default function ClassificacaoPage() {
       setResultado("andamento");
       setPlacarV("");
       setPlacarA("");
+      setGols({});
+      setAssistencias({});
       alert(
         resultado === "andamento"
           ? "Rodada sorteada e divulgada como próxima rodada. Edite depois para lançar o resultado."

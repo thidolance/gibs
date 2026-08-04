@@ -40,6 +40,9 @@ export interface Rodada {
   /** Placar da partida por time (não influencia a nota, é só o registro do jogo). */
   placarVermelho?: number;
   placarAzul?: number;
+  /** Gols e assistências por jogador nesta rodada (jogadorId → quantidade). Alimentam a nota. */
+  gols?: Record<string, number>;
+  assistencias?: Record<string, number>;
 }
 
 export interface CampeaoTrimestral {

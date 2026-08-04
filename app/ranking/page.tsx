@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Crown, Download, Flame, Star, TrendingDown, Trophy, Users } from "lucide-react";
+import { Crown, Download, Flame, Goal, Star, TrendingDown, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
@@ -42,6 +42,7 @@ export default function RankingPage() {
   const ranking = rankingJogadores(estado);
   const lider = ranking[0];
   const emSequencia = [...ranking].sort((a, b) => b.stats.sequencia - a.stats.sequencia)[0];
+  const artilheiro = [...ranking].sort((a, b) => b.stats.gols - a.stats.gols)[0];
 
   async function baixarImagem() {
     if (!capturaRef.current) return;
@@ -61,13 +62,20 @@ export default function RankingPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           titulo="Melhor nota"
           valor={lider ? lider.stats.nota.toFixed(1) : "—"}
           legenda={lider ? lider.jogador.nome : "Sem partidas ainda"}
           variante="success"
           icone={<Star />}
+        />
+        <MetricCard
+          titulo="Artilheiro"
+          valor={artilheiro && artilheiro.stats.gols > 0 ? artilheiro.jogador.nome : "—"}
+          legenda={artilheiro && artilheiro.stats.gols > 0 ? `${artilheiro.stats.gols} gol(s)` : "Ninguém marcou ainda"}
+          variante="warning"
+          icone={<Goal />}
         />
         <MetricCard
           titulo="Maior sequência"
@@ -99,9 +107,10 @@ export default function RankingPage() {
             <CardDescription>
               Todos começam em <strong>6,0</strong>. Vitórias <strong>seguidas</strong> somam cada vez mais (
               <strong>+0,2</strong>, +0,3, +0,4…) e derrotas <strong>seguidas</strong> tiram cada vez mais (
-              <strong>−0,1</strong>, −0,2, −0,3…). Título de campeão <strong>+0,5</strong>; faltar tira{" "}
-              <strong>−0,1</strong> (e zera o combo de vitória). Travado entre <strong>6 e 10</strong>. O movimento (▲▼) é
-              em relação à rodada anterior.
+              <strong>−0,1</strong>, −0,2, −0,3…). Cada <strong>gol</strong> e cada <strong>assistência</strong> valem{" "}
+              <strong>+0,05</strong>. Título de campeão <strong>+0,5</strong>; faltar tira <strong>−0,1</strong> (e zera
+              o combo de vitória). Travado entre <strong>6 e 10</strong>. O movimento (▲▼) é em relação à rodada
+              anterior.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
@@ -135,6 +144,8 @@ export default function RankingPage() {
                 <span className="w-12 text-right text-gold">Nota</span>
                 <span className="w-7 text-right">V</span>
                 <span className="w-7 text-right">D</span>
+                <span className="w-7 text-right">G</span>
+                <span className="w-7 text-right">A</span>
                 <span className="w-12 text-right">Seq</span>
               </div>
 
@@ -193,6 +204,8 @@ export default function RankingPage() {
                       </span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.vitorias}</span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.derrotas}</span>
+                      <span className="w-7 text-right text-sm font-semibold text-white/60">{linha.stats.gols}</span>
+                      <span className="w-7 text-right text-sm font-semibold text-white/60">{linha.stats.assistencias}</span>
                       <span className="flex w-12 justify-end text-sm font-semibold">
                         {linha.stats.sequencia > 0 ? (
                           <span className="inline-flex items-center gap-0.5 text-[#fb923c]">
