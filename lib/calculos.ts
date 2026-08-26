@@ -385,21 +385,16 @@ function calcularNota(
   );
 }
 
-/** Nomes combinam se são iguais ou um é prefixo (por palavra) do outro — ex.: "Henrique" ~ "Henrique Muller". */
-function nomesCombinam(a: string, b: string): boolean {
-  a = a.trim().toLowerCase();
-  b = b.trim().toLowerCase();
-  return !!a && !!b && (a === b || a.startsWith(b + " ") || b.startsWith(a + " "));
-}
-
 /** Quantas vezes cada jogador foi campeão. O quadro guarda por nome; casamos com o id
- *  de forma tolerante, só creditando quando há um único jogador correspondente. */
+ *  por nome EXATO (ignorando espaços/maiúsculas), só creditando quando há um único
+ *  jogador com aquele nome — evita creditar título ao jogador errado. */
 function campeonatosPorJogador(estado: Estado): Map<string, number> {
   const porId = new Map<string, number>();
+  const normalizar = (s: string) => s.trim().toLowerCase();
   for (const c of estado.campeoes) {
-    const nome = (c.jogadorNome ?? "").trim();
+    const nome = normalizar(c.jogadorNome ?? "");
     if (!nome) continue;
-    const candidatos = estado.jogadores.filter((j) => nomesCombinam(j.nome, nome));
+    const candidatos = estado.jogadores.filter((j) => normalizar(j.nome) === nome);
     if (candidatos.length === 1) {
       const id = candidatos[0].id;
       porId.set(id, (porId.get(id) ?? 0) + 1);

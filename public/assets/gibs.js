@@ -34,18 +34,14 @@
     };
   }
 
-  // Nomes combinam se iguais ou um é prefixo (por palavra) do outro — ex.: "Henrique" ~ "Henrique Muller".
-  function nomesCombinam(a, b) {
-    a = (a || "").trim().toLowerCase(); b = (b || "").trim().toLowerCase();
-    return !!a && !!b && (a === b || a.startsWith(b + " ") || b.startsWith(a + " "));
-  }
-  // Quantas vezes cada jogador foi campeão, casando por nome de forma tolerante (correspondência única).
+  // Quantas vezes cada jogador foi campeão, casando por nome EXATO (correspondência única).
   function campeoesPorId(e) {
     const porId = {};
+    const norm = (s) => (s || "").trim().toLowerCase();
     (e.campeoes || []).forEach((c) => {
-      const nome = (c.jogadorNome || "").trim();
+      const nome = norm(c.jogadorNome);
       if (!nome) return;
-      const cand = e.jogadores.filter((j) => nomesCombinam(j.nome, nome));
+      const cand = e.jogadores.filter((j) => norm(j.nome) === nome);
       if (cand.length === 1) porId[cand[0].id] = (porId[cand[0].id] || 0) + 1;
     });
     return porId;
