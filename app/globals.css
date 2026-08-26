@@ -84,3 +84,29 @@ body {
   background: var(--color-border-2);
   border-radius: 99px;
 }
+
+/* ── Animações do modal de jogador ── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out both;
+}
+.animate-pop-in {
+  animation: pop-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

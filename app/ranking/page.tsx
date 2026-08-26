@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { JogadorModal } from "@/components/ranking/jogador-modal";
 import { Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
-import { rankingJogadores } from "@/lib/calculos";
+import { partidasDoJogador, rankingJogadores } from "@/lib/calculos";
 import { POSICOES, type Posicao } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ function Movimento({ valor }: { valor: number }) {
 export default function RankingPage() {
   const { estado, carregando } = useEstado();
   const [baixando, setBaixando] = useState(false);
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const capturaRef = useRef<HTMLDivElement>(null);
 
   if (carregando) return <EstadoLoading />;
@@ -43,6 +45,7 @@ export default function RankingPage() {
   const ranking = rankingJogadores(estado);
   const lider = ranking[0];
   const emSequencia = [...ranking].sort((a, b) => b.stats.sequencia - a.stats.sequencia)[0];
+  const selecionado = selecionadoId ? ranking.find((l) => l.jogador.id === selecionadoId) : null;
 
   async function baixarImagem() {
     if (!capturaRef.current) return;
@@ -182,8 +185,13 @@ export default function RankingPage() {
                       <span className="w-9 shrink-0 text-center text-[11px]">
                         <Movimento valor={linha.movimento} />
                       </span>
-                      <span className="flex flex-1 items-center gap-2 truncate">
-                        <span className="truncate text-[15px] font-bold uppercase tracking-tight max-md:text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setSelecionadoId(linha.jogador.id)}
+                        title="Ver ficha do jogador"
+                        className="flex flex-1 items-center gap-2 truncate text-left transition-opacity hover:opacity-80"
+                      >
+                        <span className="truncate text-[15px] font-bold uppercase tracking-tight underline-offset-4 hover:underline max-md:text-sm">
                           {linha.jogador.nome}
                         </span>
                         {linha.titulos > 0 && (
@@ -202,7 +210,7 @@ export default function RankingPage() {
                             {POS_ABREV[linha.jogador.posicao]}
                           </span>
                         )}
-                      </span>
+                      </button>
                       <span className="w-12 text-right text-lg font-extrabold text-gold drop-shadow-[0_0_10px_rgba(245,158,11,.4)] max-md:text-base">
                         {linha.stats.nota.toFixed(1)}
                       </span>
@@ -243,6 +251,14 @@ export default function RankingPage() {
           )}
         </CardContent>
       </Card>
+
+      {selecionado && (
+        <JogadorModal
+          linha={selecionado}
+          partidas={partidasDoJogador(estado, selecionado.jogador.id)}
+          onClose={() => setSelecionadoId(null)}
+        />
+      )}
     </div>
   );
 }

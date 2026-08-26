@@ -579,6 +579,37 @@ export function rankingJogadores(estado: Estado): LinhaRanking[] {
   });
 }
 
+export interface PartidaJogador {
+  data: string;
+  resultado: "vitoria" | "derrota" | "empate";
+  time: "vermelho" | "azul";
+  /** Placar do time do jogador × adversário (null quando a rodada não teve placar lançado). */
+  golsPro: number | null;
+  golsContra: number | null;
+}
+
+/** Histórico de partidas de um jogador (só rodadas decididas em que ele entrou), da mais recente para a mais antiga. */
+export function partidasDoJogador(estado: Estado, jogadorId: string): PartidaJogador[] {
+  const todas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])];
+  const partidas: PartidaJogador[] = [];
+  for (const r of todas) {
+    if (r.resultado === "andamento") continue;
+    const noVermelho = (r.timeVermelho ?? []).includes(jogadorId);
+    const noAzul = (r.timeAzul ?? []).includes(jogadorId);
+    if (!noVermelho && !noAzul) continue;
+    const time = noVermelho ? "vermelho" : "azul";
+    const resultado = r.resultado === "empate" ? "empate" : r.resultado === time ? "vitoria" : "derrota";
+    partidas.push({
+      data: r.data,
+      resultado,
+      time,
+      golsPro: (time === "vermelho" ? r.placarVermelho : r.placarAzul) ?? null,
+      golsContra: (time === "vermelho" ? r.placarAzul : r.placarVermelho) ?? null,
+    });
+  }
+  return partidas.sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""));
+}
+
 // ── Sorteio equilibrado de times ─────────────────────────────────────────────
 // Distribui os jogadores em dois times por posição (defensor/meio/atacante/sem)
 // e, dentro de cada grupo, joga cada jogador no time de menor soma de nota — o que
