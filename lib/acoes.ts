@@ -69,11 +69,13 @@ export function removerJogador(estado: Estado, id: string): Estado {
 
   const jogosAvulsos: Estado["jogosAvulsos"] = {};
   for (const [data, g] of Object.entries(estado.jogosAvulsos)) {
+    const { [id]: _omitido, ...valoresCustom } = g.valoresCustom ?? {};
     jogosAvulsos[data] = {
       ...g,
       jogadores: (g.jogadores ?? []).filter((x) => x !== id),
       selecionados: (g.selecionados ?? []).filter((x) => x !== id),
       pagos: (g.pagos ?? []).filter((x) => x !== id),
+      valoresCustom,
     };
   }
 
@@ -152,6 +154,32 @@ export function desmarcarTodosAvulsos(estado: Estado, data: string): Estado {
 
 export function alternarPagoAvulso(estado: Estado, data: string, jogadorId: string, pago: boolean): Estado {
   return comJogoAvulso(estado, data, (g) => ({ ...g, pagos: alternarItem(g.pagos, jogadorId, pago) }));
+}
+
+/** Remove um jogador da lista já gerada de um jogo avulso (some da lista, dos pagos e do valor custom). */
+export function removerJogadorAvulso(estado: Estado, data: string, jogadorId: string): Estado {
+  return comJogoAvulso(estado, data, (g) => {
+    const { [jogadorId]: _omitido, ...valoresCustom } = g.valoresCustom ?? {};
+    return {
+      ...g,
+      jogadores: g.jogadores.filter((x) => x !== jogadorId),
+      selecionados: g.selecionados.filter((x) => x !== jogadorId),
+      pagos: g.pagos.filter((x) => x !== jogadorId),
+      valoresCustom,
+    };
+  });
+}
+
+export function salvarValorCustomAvulso(estado: Estado, data: string, jogadorId: string, valor: number | null): Estado {
+  return comJogoAvulso(estado, data, (g) => {
+    const valoresCustom = { ...g.valoresCustom };
+    if (valor === null || Number.isNaN(valor)) {
+      delete valoresCustom[jogadorId];
+    } else {
+      valoresCustom[jogadorId] = valor;
+    }
+    return { ...g, valoresCustom };
+  });
 }
 
 export function salvarObservacaoJogo(estado: Estado, data: string, observacao: string): Estado {

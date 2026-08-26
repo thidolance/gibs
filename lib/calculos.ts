@@ -41,13 +41,14 @@ export function getMensalMes(estado: Estado, mes: string): MensalistaMes {
 
 export function getJogoAvulso(estado: Estado, data: string): JogoAvulso {
   const g = estado.jogosAvulsos[data];
-  if (!g) return { data, jogadores: [], selecionados: [], pagos: [], observacao: "" };
+  if (!g) return { data, jogadores: [], selecionados: [], pagos: [], observacao: "", valoresCustom: {} };
   return {
     data: g.data,
     jogadores: g.jogadores ?? [],
     selecionados: g.selecionados ?? g.jogadores ?? [],
     pagos: g.pagos ?? [],
     observacao: g.observacao ?? "",
+    valoresCustom: g.valoresCustom ?? {},
   };
 }
 
@@ -71,6 +72,11 @@ export function valorMensalistaJogador(estado: Estado, mes: string, jogadorId: s
   return custom ? Number(custom) : valorMensalFixo(estado);
 }
 
+export function valorAvulsoJogador(estado: Estado, data: string, jogadorId: string) {
+  const custom = getJogoAvulso(estado, data).valoresCustom?.[jogadorId];
+  return custom ? Number(custom) : valorAvulsoFixo(estado);
+}
+
 export function jogadoresDisponiveisAvulso(estado: Estado, mes: string) {
   const confirmados = getMensalMes(estado, mes).confirmados;
   return estado.jogadores.filter((j) => !confirmados.includes(j.id));
@@ -87,7 +93,6 @@ export function dadosCaixa(estado: Estado, mes: string): DadosCaixa {
     (s, g) => s + g.pagos.filter((id) => g.jogadores.includes(id)).length,
     0,
   );
-  const qtdAvPend = Math.max(qtdAv - qtdAvPagos, 0);
 
   const valorMensal = valorMensalFixo(estado);
   const valorAvulso = valorAvulsoFixo(estado);
@@ -97,8 +102,18 @@ export function dadosCaixa(estado: Estado, mes: string): DadosCaixa {
 
   const mensRec = m.pagos.reduce((s, id) => s + valorDe(id), 0);
   const mensAR = m.confirmados.filter((id) => !m.pagos.includes(id)).reduce((s, id) => s + valorDe(id), 0);
-  const avRec = qtdAvPagos * valorAvulso;
-  const avAR = qtdAvPend * valorAvulso;
+
+  // Avulsos usam valor individual quando definido; senão o valor de avulso padrão.
+  const valorAvulsoDe = (g: JogoAvulso, id: string) =>
+    g.valoresCustom?.[id] ? Number(g.valoresCustom[id]) : valorAvulso;
+  let avRec = 0;
+  let avAR = 0;
+  for (const g of jogos) {
+    for (const id of g.jogadores) {
+      if (g.pagos.includes(id)) avRec += valorAvulsoDe(g, id);
+      else avAR += valorAvulsoDe(g, id);
+    }
+  }
 
   const extras = receitasExtrasDoMes(estado, mes).reduce((s, d) => s + Number(d.valor || 0), 0);
   const desp = despesasDoMes(estado, mes).reduce((s, d) => s + Number(d.valor || 0), 0);
@@ -200,6 +215,7 @@ export function normalizarEstado(valor: unknown): Estado {
       selecionados: normalizarArr<string>(gg.selecionados ?? gg.jogadores),
       pagos: normalizarArr<string>(gg.pagos),
       observacao: (gg.observacao as string) ?? "",
+      valoresCustom: (gg.valoresCustom as Record<string, number>) ?? {},
     };
   }
 
@@ -207,16 +223,6 @@ export function normalizarEstado(valor: unknown): Estado {
     if (valor === undefined || valor === null || valor === "") return undefined;
     const n = Number(valor);
     return Number.isFinite(n) && n >= 0 ? n : undefined;
-  };
-
-  const normalizarContagem = (valor: unknown): Record<string, number> => {
-    if (!valor || typeof valor !== "object") return {};
-    const contagem: Record<string, number> = {};
-    for (const [id, n] of Object.entries(valor as Record<string, unknown>)) {
-      const qtd = Number(n);
-      if (qtd > 0) contagem[id] = qtd;
-    }
-    return contagem;
   };
 
   const normalizarRodada = (r: Partial<Rodada> & Record<string, unknown>): Rodada => ({
@@ -227,8 +233,6 @@ export function normalizarEstado(valor: unknown): Estado {
     resultado: (r.resultado as Rodada["resultado"]) ?? "empate",
     ...(normalizarPlacar(r.placarVermelho) !== undefined ? { placarVermelho: normalizarPlacar(r.placarVermelho) } : {}),
     ...(normalizarPlacar(r.placarAzul) !== undefined ? { placarAzul: normalizarPlacar(r.placarAzul) } : {}),
-    gols: normalizarContagem(r.gols),
-    assistencias: normalizarContagem(r.assistencias),
   });
 
   const rodadas = normalizarArr<Partial<Rodada> & Record<string, unknown>>(v.rodadas).map(normalizarRodada);
@@ -344,8 +348,8 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 }
 
 // ── Nota e ranking de jogadores ──────────────────────────────────────────────
-// Todos começam em NOTA_BASE (6). Vitória e gols sobem, derrota desce e cada
-// título de campeão soma um bônus — sempre travado no intervalo [NOTA_MIN, NOTA_MAX].
+// Todos começam em NOTA_BASE (6). Vitória sobe, derrota desce e cada título de
+// campeão soma um bônus — sempre travado no intervalo [NOTA_MIN, NOTA_MAX].
 // Empate é neutro. A nota usa TODAS as rodadas já jogadas (atuais + arquivadas),
 // então ela sobrevive ao encerramento de um trimestral.
 
@@ -354,8 +358,6 @@ export const NOTA_MIN = 6; // piso: a nota nunca baixa de 6
 export const NOTA_MAX = 10;
 export const PASSO_CAMPEAO = 0.5;
 export const PASSO_AUSENCIA = 0.1; // perde por rodada que rolou desde a estreia e não jogou
-export const PASSO_GOL = 0.05;
-export const PASSO_ASSISTENCIA = 0.05;
 
 function limitar(valor: number, min: number, max: number) {
   return Math.min(max, Math.max(min, valor));
@@ -371,19 +373,13 @@ function pontosDerrotaSeguida(sequencia: number) {
   return 0.1 * sequencia;
 }
 
-/** Nota = base + combo de vitórias + gols/assistências + títulos − combo de derrotas − ausências, travada em [6, 10]. */
+/** Nota = base + combo de vitórias + títulos − combo de derrotas − ausências, travada em [6, 10]. */
 function calcularNota(
-  s: { pontosVitoria: number; pontosDerrota: number; ausencias: number; gols: number; assistencias: number },
+  s: { pontosVitoria: number; pontosDerrota: number; ausencias: number },
   campeonatos: number,
 ) {
   return limitar(
-    NOTA_BASE +
-      s.pontosVitoria +
-      s.gols * PASSO_GOL +
-      s.assistencias * PASSO_ASSISTENCIA +
-      campeonatos * PASSO_CAMPEAO -
-      s.pontosDerrota -
-      s.ausencias * PASSO_AUSENCIA,
+    NOTA_BASE + s.pontosVitoria + campeonatos * PASSO_CAMPEAO - s.pontosDerrota - s.ausencias * PASSO_AUSENCIA,
     NOTA_MIN,
     NOTA_MAX,
   );
@@ -417,9 +413,6 @@ export interface EstatisticaJogador {
   derrotas: number;
   empates: number;
   jogos: number;
-  /** Gols e assistências somados em todas as rodadas (cada um vale +0,05 na nota). */
-  gols: number;
-  assistencias: number;
   /** Rodadas que rolaram desde a estreia e o jogador não jogou. */
   ausencias: number;
   /** Combo atual de vitórias seguidas (zera ao perder ou faltar). */
@@ -439,8 +432,6 @@ function novoStat(): EstatisticaJogador {
     derrotas: 0,
     empates: 0,
     jogos: 0,
-    gols: 0,
-    assistencias: 0,
     ausencias: 0,
     sequencia: 0,
     sequenciaDerrota: 0,
@@ -452,7 +443,7 @@ function novoStat(): EstatisticaJogador {
 
 /**
  * Percorre as rodadas em ordem e apura, para cada jogador: vitórias/derrotas/empates,
- * gols/assistências, o combo de vitórias seguidas (empate mantém, derrota e falta zeram)
+ * o combo de vitórias seguidas (empate mantém, derrota e falta zeram)
  * e as ausências desde a estreia.
  */
 export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, EstatisticaJogador> {
@@ -486,8 +477,6 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
         jaEstreou.add(id);
         const s = stats.get(id)!;
         s.jogos++;
-        s.gols += Number(r.gols?.[id] ?? 0);
-        s.assistencias += Number(r.assistencias?.[id] ?? 0);
         if (r.resultado === "empate") {
           s.empates++; // empate é neutro: não zera nem soma nenhum combo
         } else if (venceu) {
@@ -551,14 +540,13 @@ function statOuPadrao(stats: Map<string, EstatisticaJogador>, id: string): Estat
   return stats.get(id) ?? novoStat();
 }
 
-/** Ordena TODOS os jogadores cadastrados por nota (desempate: gols, vitórias, sequência, nome). */
+/** Ordena TODOS os jogadores cadastrados por nota (desempate: vitórias, sequência, nome). */
 function ordenarPorNota(estado: Estado, stats: Map<string, EstatisticaJogador>): Jogador[] {
   return [...estado.jogadores].sort((a, b) => {
     const sa = statOuPadrao(stats, a.id);
     const sb = statOuPadrao(stats, b.id);
     return (
       sb.nota - sa.nota ||
-      sb.gols - sa.gols ||
       sb.vitorias - sa.vitorias ||
       sb.sequencia - sa.sequencia ||
       a.nome.localeCompare(b.nome)

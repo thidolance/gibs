@@ -10,10 +10,10 @@ const ABAS = [
   { href: "/painel", label: "Dashboard" },
   { href: "/jogadores", label: "Jogadores" },
   { href: "/mensalistas", label: "Mensalistas" },
+  { href: "/avulsos", label: "Avulsos" },
   { href: "/classificacao", label: "Classificação" },
   { href: "/ranking", label: "Ranking" },
   { href: "/loja", label: "Loja" },
-  { href: "/avulsos", label: "Avulsos" },
   { href: "/caixa", label: "Balanço de caixa" },
   { href: "/configuracoes", label: "Configurações" },
 ] as const;

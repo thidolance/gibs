@@ -29,6 +29,8 @@ export interface JogoAvulso {
   selecionados: string[];
   pagos: string[];
   observacao: string;
+  /** Valor individual por jogador quando difere do valor de avulso padrão (jogadorId → valor). */
+  valoresCustom: Record<string, number>;
 }
 
 export type ResultadoRodada = "vermelho" | "azul" | "empate" | "andamento";
@@ -42,9 +44,6 @@ export interface Rodada {
   /** Placar da partida por time (não influencia a nota, é só o registro do jogo). */
   placarVermelho?: number;
   placarAzul?: number;
-  /** Gols e assistências por jogador nesta rodada (jogadorId → quantidade). Alimentam a nota. */
-  gols?: Record<string, number>;
-  assistencias?: Record<string, number>;
 }
 
 export interface CampeaoTrimestral {

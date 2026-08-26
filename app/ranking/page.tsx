@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Crown, Download, Flame, Goal, Star, TrendingDown, Trophy, Users } from "lucide-react";
+import { Crown, Download, Flame, Star, TrendingDown, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstadoLoading } from "@/components/layout/estado-loading";
@@ -19,8 +19,9 @@ const POS_ABREV: Record<Posicao, string> = {
   atacante: "ATA",
 };
 
+// Mesmas cores das tags de posição usadas no scoreboard da Classificação.
 const POS_COR: Record<Posicao, string> = {
-  defensor: "bg-blue-3/25 text-blue-3",
+  defensor: "bg-blue-3/25 text-blue-light",
   meio: "bg-[#22c55e]/25 text-[#4ade80]",
   atacante: "bg-red/30 text-red-light",
 };
@@ -42,13 +43,12 @@ export default function RankingPage() {
   const ranking = rankingJogadores(estado);
   const lider = ranking[0];
   const emSequencia = [...ranking].sort((a, b) => b.stats.sequencia - a.stats.sequencia)[0];
-  const artilheiro = [...ranking].sort((a, b) => b.stats.gols - a.stats.gols)[0];
 
   async function baixarImagem() {
     if (!capturaRef.current) return;
     setBaixando(true);
     try {
-      const url = await toPng(capturaRef.current, { pixelRatio: 3, backgroundColor: "#ffffff", cacheBust: true });
+      const url = await toPng(capturaRef.current, { pixelRatio: 3, backgroundColor: "#0a1226", cacheBust: true });
       const link = document.createElement("a");
       link.download = "ranking-gibs.png";
       link.href = url;
@@ -62,20 +62,13 @@ export default function RankingPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
           titulo="Melhor nota"
           valor={lider ? lider.stats.nota.toFixed(1) : "—"}
           legenda={lider ? lider.jogador.nome : "Sem partidas ainda"}
           variante="success"
           icone={<Star />}
-        />
-        <MetricCard
-          titulo="Artilheiro"
-          valor={artilheiro && artilheiro.stats.gols > 0 ? artilheiro.jogador.nome : "—"}
-          legenda={artilheiro && artilheiro.stats.gols > 0 ? `${artilheiro.stats.gols} gol(s)` : "Ninguém marcou ainda"}
-          variante="warning"
-          icone={<Goal />}
         />
         <MetricCard
           titulo="Maior sequência"
@@ -107,10 +100,9 @@ export default function RankingPage() {
             <CardDescription>
               Todos começam em <strong>6,0</strong>. Vitórias <strong>seguidas</strong> somam cada vez mais (
               <strong>+0,2</strong>, +0,3, +0,4…) e derrotas <strong>seguidas</strong> tiram cada vez mais (
-              <strong>−0,1</strong>, −0,2, −0,3…). Cada <strong>gol</strong> e cada <strong>assistência</strong> valem{" "}
-              <strong>+0,05</strong>. Título de campeão <strong>+0,5</strong>; faltar tira <strong>−0,1</strong> (e zera
-              o combo de vitória). Travado entre <strong>6 e 10</strong>. O movimento (▲▼) é em relação à rodada
-              anterior.
+              <strong>−0,1</strong>, −0,2, −0,3…). Título de campeão <strong>+0,5</strong>; faltar tira{" "}
+              <strong>−0,1</strong> (e zera o combo de vitória). Travado entre <strong>6 e 10</strong>. O movimento (▲▼)
+              é em relação à rodada anterior.
             </CardDescription>
           </div>
           <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
@@ -123,13 +115,20 @@ export default function RankingPage() {
           ) : (
             <div
               ref={capturaRef}
-              className="overflow-hidden rounded-xl bg-[linear-gradient(165deg,#0a1730_0%,#0e2258_55%,#0a1730_100%)] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
+              className="relative overflow-hidden rounded-xl bg-[linear-gradient(180deg,rgba(12,20,46,.96),rgba(6,12,30,.96))] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
             >
+              {/* Barra de topo em gradiente (azul → roxo → vermelho), igual à Classificação */}
+              <div className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#3b82f6,#9333ea_50%,#ff2e2e)]" />
+
+              {/* Cabeçalho estilo scoreboard */}
               <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-4">
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold uppercase tracking-[0.28em] text-gold">Gibs FC</div>
                   <h2 className="text-2xl font-extrabold uppercase leading-none tracking-tight max-md:text-xl">
-                    Ranking<span className="ml-2 text-gold">Jogadores</span>
+                    Ranking
+                    <span className="ml-2 bg-[linear-gradient(100deg,#ff2e2e,#9333ea_60%,#3b82f6)] bg-clip-text text-transparent">
+                      Jogadores
+                    </span>
                   </h2>
                 </div>
                 <span className="shrink-0 rounded-md bg-[#16a34a] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm">
@@ -137,24 +136,25 @@ export default function RankingPage() {
                 </span>
               </div>
 
+              {/* Cabeçalho das colunas */}
               <div className="flex items-center gap-3 px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-white/45">
                 <span className="w-7 shrink-0 text-center">#</span>
-                <span className="w-10 shrink-0 text-center">Mov</span>
+                <span className="w-9 shrink-0 text-center">Mov</span>
                 <span className="flex-1">Jogador</span>
                 <span className="w-12 text-right text-gold">Nota</span>
                 <span className="w-7 text-right">V</span>
                 <span className="w-7 text-right">D</span>
-                <span className="w-7 text-right">G</span>
-                <span className="w-7 text-right">A</span>
+                <span className="w-7 text-right">J</span>
                 <span className="w-12 text-right">Seq</span>
               </div>
 
+              {/* Linhas */}
               <div className="flex flex-col gap-1">
                 {ranking.map((linha, i) => {
                   const podio = [
-                    "bg-[linear-gradient(135deg,#fbbf24,#d97706)] text-[#3a2500]",
-                    "bg-[linear-gradient(135deg,#e2e8f0,#94a3b8)] text-[#1e293b]",
-                    "bg-[linear-gradient(135deg,#e0a26a,#a15a1e)] text-white",
+                    "bg-[linear-gradient(135deg,#fbbf24,#d97706)] text-[#3a2500]", // 1º ouro
+                    "bg-[linear-gradient(135deg,#e2e8f0,#94a3b8)] text-[#1e293b]", // 2º prata
+                    "bg-[linear-gradient(135deg,#e0a26a,#a15a1e)] text-white", // 3º bronze
                   ];
                   const badge = podio[i] ?? "bg-white/10 text-white/80";
                   const acento = i === 0 ? "bg-gold" : i === 1 ? "bg-white/50" : i === 2 ? "bg-[#c07a3a]" : "bg-red";
@@ -163,19 +163,23 @@ export default function RankingPage() {
                       key={linha.jogador.id}
                       className={cn(
                         "flex items-center gap-3 rounded-md py-2 pr-2 pl-0",
-                        i < 3 ? "bg-white/[0.08]" : "bg-white/[0.03]",
+                        i === 0
+                          ? "bg-[linear-gradient(90deg,rgba(245,158,11,.18),rgba(245,158,11,.02))] shadow-[inset_0_0_0_1px_rgba(245,158,11,.32)]"
+                          : i < 3
+                            ? "bg-white/[0.08]"
+                            : "bg-white/[0.03]",
                       )}
                     >
                       <span className={cn("h-7 w-1 shrink-0 rounded-full", acento)} />
                       <span
                         className={cn(
-                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold",
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold shadow-[0_3px_8px_-3px_rgba(0,0,0,.5)]",
                           badge,
                         )}
                       >
                         {i + 1}
                       </span>
-                      <span className="w-8 shrink-0 text-center text-[11px]">
+                      <span className="w-9 shrink-0 text-center text-[11px]">
                         <Movimento valor={linha.movimento} />
                       </span>
                       <span className="flex flex-1 items-center gap-2 truncate">
@@ -199,13 +203,12 @@ export default function RankingPage() {
                           </span>
                         )}
                       </span>
-                      <span className="w-12 text-right text-lg font-extrabold text-gold max-md:text-base">
+                      <span className="w-12 text-right text-lg font-extrabold text-gold drop-shadow-[0_0_10px_rgba(245,158,11,.4)] max-md:text-base">
                         {linha.stats.nota.toFixed(1)}
                       </span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.vitorias}</span>
                       <span className="w-7 text-right text-sm font-semibold text-white/80">{linha.stats.derrotas}</span>
-                      <span className="w-7 text-right text-sm font-semibold text-white/60">{linha.stats.gols}</span>
-                      <span className="w-7 text-right text-sm font-semibold text-white/60">{linha.stats.assistencias}</span>
+                      <span className="w-7 text-right text-sm font-semibold text-white/45">{linha.stats.jogos}</span>
                       <span className="flex w-12 justify-end text-sm font-semibold">
                         {linha.stats.sequencia > 0 ? (
                           <span className="inline-flex items-center gap-0.5 text-[#fb923c]">
@@ -226,6 +229,7 @@ export default function RankingPage() {
                 })}
               </div>
 
+              {/* Legenda */}
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-white/10 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-white/45">
                 {POSICOES.map((p) => (
                   <span key={p.valor} className="flex items-center gap-1.5">

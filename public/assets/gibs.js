@@ -4,12 +4,12 @@
   const DB_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/estado.json";
   const LOJA_URL = "https://gibs-51f02-default-rtdb.firebaseio.com/loja.json";
 
-  const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PCAMP = 0.5, PAUS = 0.1, PGOL = 0.05, PASSIST = 0.05;
+  const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PCAMP = 0.5, PAUS = 0.1;
   const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
-  const novoStat = () => ({ v: 0, d: 0, em: 0, j: 0, gols: 0, assist: 0, aus: 0, seq: 0, seqD: 0, pv: 0, pd: 0, nota: NOTA_BASE });
+  const novoStat = () => ({ v: 0, d: 0, em: 0, j: 0, aus: 0, seq: 0, seqD: 0, pv: 0, pd: 0, nota: NOTA_BASE });
   const comboV = (seq) => 0.1 * (seq + 1); // 0,2 · 0,3 · 0,4 ... por vitória seguida
   const comboD = (seq) => 0.1 * seq;       // 0,1 · 0,2 · 0,3 ... por derrota seguida
-  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.pv + s.gols * PGOL + s.assist * PASSIST + (camp || 0) * PCAMP - s.pd - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
+  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.pv + (camp || 0) * PCAMP - s.pd - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
   const arr = (v) => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -23,8 +23,7 @@
     v = v || {};
     const jogadores = arr(v.jogadores).map((j) => ({ id: j.id, nome: j.nome || "", posicao: j.posicao }));
     const plc = (x) => (x === undefined || x === null || x === "" ? null : Number(x));
-    const cont = (x) => { const o = {}; for (const [id, n] of Object.entries(x || {})) { const q = Number(n); if (q > 0) o[id] = q; } return o; };
-    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), placarVermelho: plc(r.placarVermelho), placarAzul: plc(r.placarAzul), gols: cont(r.gols), assistencias: cont(r.assistencias) });
+    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), placarVermelho: plc(r.placarVermelho), placarAzul: plc(r.placarAzul) });
     return {
       mes: v.mes, jogadores,
       rodadas: arr(v.rodadas).map(rod),
@@ -72,7 +71,7 @@
       .filter((x) => x.jogador).sort((a, b) => b.pontos - a.pontos || b.v - a.v || b.j - a.j || a.jogador.nome.localeCompare(b.jogador.nome));
   }
 
-  // Percorre as rodadas em ordem: apura V/D/E, gols/assistências, combo de vitórias
+  // Percorre as rodadas em ordem: apura V/D/E, combo de vitórias
   // seguidas (empate mantém, derrota e falta zeram) e ausências desde a estreia.
   function estatisticas(rodadas) {
     const t = {}; const estreou = {};
@@ -85,8 +84,6 @@
           if (!t[id]) t[id] = novoStat();
           estreou[id] = 1;
           const x = t[id]; x.j++;
-          x.gols += Number((r.gols || {})[id] || 0);
-          x.assist += Number((r.assistencias || {})[id] || 0);
           if (r.resultado === "empate") x.em++;
           else if (w) { x.v++; x.seq++; x.pv += comboV(x.seq); x.seqD = 0; }
           else { x.d++; x.seqD++; x.pd += comboD(x.seqD); x.seq = 0; }
@@ -107,7 +104,7 @@
   }
   const statPad = (st, id) => st[id] || novoStat();
   // Todos os jogadores cadastrados entram no ranking (quem não jogou fica com a nota base).
-  const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.gols - A.gols || B.v - A.v || B.seq - A.seq || a.nome.localeCompare(b.nome); });
+  const ordenar = (e, st) => e.jogadores.slice().sort((a, b) => { const A = statPad(st, a.id), B = statPad(st, b.id); return B.nota - A.nota || B.v - A.v || B.seq - A.seq || a.nome.localeCompare(b.nome); });
 
   function ranking(e) {
     const todas = e.rodadas.concat(e.rodadasArquivadas);

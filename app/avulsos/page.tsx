@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, Copy } from "lucide-react";
+import { Check, ChevronDown, Copy, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +15,9 @@ import {
   alternarSelecaoAvulso,
   desmarcarTodosAvulsos,
   gerarListaAvulsos,
+  removerJogadorAvulso,
   salvarObservacaoJogo,
+  salvarValorCustomAvulso,
 } from "@/lib/acoes";
 import {
   avulsosDoMes,
@@ -23,6 +25,7 @@ import {
   gerarRelatorioAvulsos,
   jogadoresDisponiveisAvulso,
   valorAvulsoFixo,
+  valorAvulsoJogador,
 } from "@/lib/calculos";
 import { dataBR, dinheiro, hoje } from "@/lib/utils";
 import type { Jogador } from "@/lib/types";
@@ -35,6 +38,7 @@ export default function AvulsosPage() {
   const [mostrarTodaSelecao, setMostrarTodaSelecao] = useState(false);
   const [mostrarTodoPagamento, setMostrarTodoPagamento] = useState(false);
   const [mostrarPrevia, setMostrarPrevia] = useState(false);
+  const [editandoValorKey, setEditandoValorKey] = useState<string | null>(null);
 
   if (carregando) return <EstadoLoading />;
 
@@ -88,6 +92,17 @@ export default function AvulsosPage() {
 
   function alternarPago(jogadorId: string, data: string, pago: boolean) {
     atualizarEstado((atual) => alternarPagoAvulso(atual, data, jogadorId, pago));
+  }
+
+  function removerAvulso(jogadorId: string, data: string, nome: string) {
+    if (!confirm(`Remover ${nome} da lista de ${dataBR(data)}?`)) return;
+    atualizarEstado((atual) => removerJogadorAvulso(atual, data, jogadorId));
+  }
+
+  function salvarValor(jogadorId: string, data: string, valorTexto: string) {
+    const valor = Number(valorTexto);
+    atualizarEstado((atual) => salvarValorCustomAvulso(atual, data, jogadorId, valor > 0 ? valor : null));
+    setEditandoValorKey(null);
   }
 
   function copiarLista() {
@@ -182,20 +197,61 @@ export default function AvulsosPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendentesVisiveis.map(({ jogador, data }) => (
-                      <TableRow key={`${data}-${jogador.id}`}>
-                        <TableCell>
-                          <strong>{jogador.nome}</strong>
-                        </TableCell>
-                        <TableCell>{dataBR(data)}</TableCell>
-                        <TableCell>{dinheiro(valorAvulsoFixo(estado))}</TableCell>
-                        <TableCell>
-                          <Button size="sm" onClick={() => alternarPago(jogador.id, data, true)}>
-                            <Check /> Marcar pago
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {pendentesVisiveis.map(({ jogador, data }) => {
+                      const chave = `${data}-${jogador.id}`;
+                      const valor = valorAvulsoJogador(estado, data, jogador.id);
+                      return (
+                        <TableRow key={chave}>
+                          <TableCell>
+                            <strong>{jogador.nome}</strong>
+                          </TableCell>
+                          <TableCell>{dataBR(data)}</TableCell>
+                          <TableCell>
+                            {editandoValorKey === chave ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                autoFocus
+                                defaultValue={valor}
+                                className="h-8 w-[100px] min-h-0 px-2 py-1"
+                                onBlur={(e) => salvarValor(jogador.id, data, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") salvarValor(jogador.id, data, e.currentTarget.value);
+                                  if (e.key === "Escape") setEditandoValorKey(null);
+                                }}
+                              />
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <strong>{dinheiro(valor)}</strong>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Editar valor"
+                                  onClick={() => setEditandoValorKey(chave)}
+                                >
+                                  <Pencil />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Button size="sm" onClick={() => alternarPago(jogador.id, data, true)}>
+                                <Check /> Marcar pago
+                              </Button>
+                              <Button
+                                variant="action-delete"
+                                size="icon-sm"
+                                title="Remover da lista"
+                                onClick={() => removerAvulso(jogador.id, data, jogador.nome)}
+                              >
+                                <Trash2 />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 {!mostrarTodoPagamento && pendentes.length > LIMITE && (
