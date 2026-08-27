@@ -24,6 +24,8 @@
 
   <footer class="rodape">Gibs FC · <a href="inicio.html">Início</a> · <a href="loja.html">Loja</a></footer>
 
+  <div id="modal-root"></div>
+
   <script src="/assets/gibs.js"></script>
   <script>
     let ESTADO = null;
@@ -62,7 +64,7 @@
         const mov = l.mov > 0 ? '<span class="up">▲ ' + l.mov + "</span>" : l.mov < 0 ? '<span class="down">▼ ' + Math.abs(l.mov) + "</span>" : '<span class="flat">—</span>';
         return '<div class="row ' + (i === 0 ? "lider " : "") + (i < 3 ? "top3" : "") + '" ' + delay(i) + '">' +
           '<span class="acc" style="' + accPos(i) + '"></span><span class="posn" style="' + badgePos(i) + '">' + (i + 1) + "</span>" +
-          '<span class="w-mov">' + mov + '</span><span class="nome">' + G().esc(l.jogador.nome) + G().coroa(camp, l.jogador.id) + " " + tagPos(l.jogador.posicao) + "</span>" +
+          '<span class="w-mov">' + mov + '</span><span class="nome nome-link" data-jogador="' + l.jogador.id + '" title="Ver ficha do jogador">' + G().esc(l.jogador.nome) + G().coroa(camp, l.jogador.id) + " " + tagPos(l.jogador.posicao) + "</span>" +
           '<span class="w-big pts">' + l.stats.nota.toFixed(1) + '</span><span class="w-num">' + l.stats.v + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.d + '</span><span class="w-num" style="color:var(--muted-2)">' + l.stats.j + '</span><span class="w-seq">' + G().seqBadge(l.stats) + "</span></div>";
       }).join("");
       return '<div class="board"><div class="meta">Gibs FC · Notas 6–10</div><h2>Ranking <span>Jogadores</span></h2>' +
@@ -101,6 +103,78 @@
       const html = tab === "rodadas" ? renderRodadas(ESTADO) : tab === "ranking" ? renderRanking(ESTADO) : renderClassificacao(ESTADO);
       conteudo.innerHTML = '<div class="painel ativo">' + html + "</div>";
     }
+
+    // ── Ficha do jogador (modal ao clicar no nome no ranking) ──
+    const modalRoot = document.getElementById("modal-root");
+    const RES = { vitoria: { l: "V", rot: "Vitória" }, derrota: { l: "D", rot: "Derrota" }, empate: { l: "E", rot: "Empate" } };
+
+    function fecharFicha() {
+      modalRoot.innerHTML = "";
+      document.body.style.overflow = "";
+    }
+
+    function abrirFicha(id) {
+      const linha = G().ranking(ESTADO).find((l) => l.jogador.id === id);
+      if (!linha) return;
+      const j = linha.jogador, s = linha.stats;
+      const camp = G().campeoesPorId(ESTADO);
+      const ehCampeao = !!camp[id];
+      const partidas = G().partidasDoJogador(ESTADO, id);
+      const aprov = s.j ? Math.round(((s.v * 3 + s.em) / (s.j * 3)) * 100) : 0;
+
+      const seq = s.seq > 0
+        ? '<span class="fseq v">' + G().seqBadge({ seq: s.seq, seqD: 0 }).replace(/^<span[^>]*>/, "").replace(/<\/span>$/, "") + " vitória" + (s.seq > 1 ? "s" : "") + " seguida" + (s.seq > 1 ? "s" : "") + "</span>"
+        : s.seqD > 0
+          ? '<span class="fseq d">' + G().seqBadge({ seq: 0, seqD: s.seqD }).replace(/^<span[^>]*>/, "").replace(/<\/span>$/, "") + " derrota" + (s.seqD > 1 ? "s" : "") + " seguida" + (s.seqD > 1 ? "s" : "") + "</span>"
+          : '<span class="fseq flat">Sem sequência ativa</span>';
+
+      const forma = partidas.slice(0, 10).map((p) =>
+        '<span class="selo r-' + RES[p.resultado].l + '" title="' + G().esc(G().dataBR(p.data)) + " · " + RES[p.resultado].rot + '">' + RES[p.resultado].l + "</span>"
+      ).join("");
+
+      const lista = partidas.length
+        ? partidas.map((p) => {
+            const temPlacar = p.golsPro !== null && p.golsContra !== null;
+            const placar = temPlacar ? '<span class="pscore">' + p.golsPro + ' <span class="x">×</span> ' + p.golsContra + "</span>" : "";
+            return '<div class="partida"><span class="chip c-' + RES[p.resultado].l + '">' + RES[p.resultado].l + "</span>" +
+              '<span class="ptime"><span class="pdot ' + (p.time === "vermelho" ? "v" : "a") + '"></span>Time ' + (p.time === "vermelho" ? "Vermelho" : "Azul") + "</span>" +
+              placar + '<span class="pdata">' + G().esc(G().dataBR(p.data)) + "</span></div>";
+          }).join("")
+        : '<div class="fvazio">Nenhuma partida registrada ainda.</div>';
+
+      modalRoot.innerHTML =
+        '<div class="ficha-overlay"><div class="ficha">' +
+        '<button class="ficha-close" aria-label="Fechar">✕</button>' +
+        '<div class="ficha-head">' +
+        '<span class="ficha-posn">' + linha.pos + "</span>" +
+        '<div class="ficha-id"><div class="ficha-meta">Gibs FC · Ficha</div>' +
+        '<h3>' + G().esc(j.nome) + (ehCampeao ? G().coroa(camp, id) : "") + "</h3>" +
+        '<div class="ficha-tags">' + tagPos(j.posicao) + (ehCampeao ? '<span class="ficha-tit">🏆 ' + camp[id] + "x campeão</span>" : "") + "</div></div>" +
+        '<div class="ficha-nota"><b>' + s.nota.toFixed(1) + "</b><span>Nota</span></div>" +
+        "</div>" +
+        '<div class="ficha-body">' +
+        '<div class="ficha-stats">' +
+        '<div class="fstat"><b>' + s.j + "</b><span>Jogos</span></div>" +
+        '<div class="fstat"><b class="ok">' + s.v + "</b><span>Vitórias</span></div>" +
+        '<div class="fstat"><b class="bad">' + s.d + "</b><span>Derrotas</span></div>" +
+        '<div class="fstat"><b>' + s.em + "</b><span>Empates</span></div>" +
+        "</div>" +
+        '<div class="ficha-linha">' + seq + '<span class="faprov"><b>' + aprov + "%</b> aprov.</span></div>" +
+        (forma ? '<div class="ficha-sec"><div class="ficha-rot">Forma recente (mais recente primeiro)</div><div class="forma">' + forma + "</div></div>" : "") +
+        '<div class="ficha-sec"><div class="ficha-rot">Últimas partidas</div><div class="partidas">' + lista + "</div></div>" +
+        "</div></div></div>";
+
+      document.body.style.overflow = "hidden";
+      modalRoot.querySelector(".ficha-close").addEventListener("click", fecharFicha);
+      modalRoot.querySelector(".ficha-overlay").addEventListener("click", (ev) => { if (ev.target.classList.contains("ficha-overlay")) fecharFicha(); });
+    }
+
+    // Clique nos nomes do ranking (delegação) e Esc para fechar.
+    conteudo.addEventListener("click", (ev) => {
+      const alvo = ev.target.closest(".nome-link");
+      if (alvo && alvo.dataset.jogador) abrirFicha(alvo.dataset.jogador);
+    });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") fecharFicha(); });
 
     function irPara(tab) {
       document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("ativo", b.dataset.tab === tab));

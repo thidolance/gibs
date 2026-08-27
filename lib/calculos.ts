@@ -599,13 +599,14 @@ export function partidasDoJogador(estado: Estado, jogadorId: string): PartidaJog
     if (!noVermelho && !noAzul) continue;
     const time = noVermelho ? "vermelho" : "azul";
     const resultado = r.resultado === "empate" ? "empate" : r.resultado === time ? "vitoria" : "derrota";
-    partidas.push({
-      data: r.data,
-      resultado,
-      time,
-      golsPro: (time === "vermelho" ? r.placarVermelho : r.placarAzul) ?? null,
-      golsContra: (time === "vermelho" ? r.placarAzul : r.placarVermelho) ?? null,
-    });
+    let golsPro = (time === "vermelho" ? r.placarVermelho : r.placarAzul) ?? null;
+    let golsContra = (time === "vermelho" ? r.placarAzul : r.placarVermelho) ?? null;
+    // Jogo com vencedor mas sem placar lançado: assume 3×0 a favor de quem venceu.
+    if (golsPro === null && golsContra === null && resultado !== "empate") {
+      golsPro = resultado === "vitoria" ? 3 : 0;
+      golsContra = resultado === "vitoria" ? 0 : 3;
+    }
+    partidas.push({ data: r.data, resultado, time, golsPro, golsContra });
   }
   return partidas.sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""));
 }

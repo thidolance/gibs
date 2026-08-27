@@ -110,6 +110,27 @@
     return ordem.map((j, i) => ({ jogador: j, stats: statPad(stA, j.id), pos: i + 1, mov: pAnt[j.id] === undefined ? 0 : pAnt[j.id] - i }));
   }
 
+  // Histórico de partidas de um jogador (rodadas decididas em que entrou), da mais recente para a mais antiga.
+  function partidasDoJogador(e, id) {
+    const todas = e.rodadas.concat(e.rodadasArquivadas);
+    const out = [];
+    for (const r of todas) {
+      if (r.resultado === "andamento") continue;
+      const noV = (r.timeVermelho || []).includes(id), noA = (r.timeAzul || []).includes(id);
+      if (!noV && !noA) continue;
+      const time = noV ? "vermelho" : "azul";
+      const resultado = r.resultado === "empate" ? "empate" : r.resultado === time ? "vitoria" : "derrota";
+      let gp = (time === "vermelho" ? r.placarVermelho : r.placarAzul);
+      let gc = (time === "vermelho" ? r.placarAzul : r.placarVermelho);
+      if (gp == null) gp = null;
+      if (gc == null) gc = null;
+      // Jogo com vencedor mas sem placar lançado: assume 3×0 a favor de quem venceu.
+      if (gp === null && gc === null && resultado !== "empate") { gp = resultado === "vitoria" ? 3 : 0; gc = resultado === "vitoria" ? 0 : 3; }
+      out.push({ data: r.data, resultado, time, golsPro: gp, golsContra: gc });
+    }
+    return out.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+  }
+
   // ── Header (escudo central + menu simétrico + próxima rodada) ──
   function iconInsta() {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/></svg>';
@@ -206,7 +227,7 @@
 
   window.GIBS = {
     DB_URL, LOJA_URL, esc, nomeMes, dataBR, dataExt, dinheiro, POS,
-    classificacao, ranking, campeoesPorId, coroa, seqBadge,
+    classificacao, ranking, campeoesPorId, coroa, seqBadge, partidasDoJogador,
     carregar() {
       return fetch(DB_URL).then((r) => r.json()).then((d) => {
         const estado = normalizar(d);
