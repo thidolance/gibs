@@ -180,17 +180,54 @@ export function ElencoCard({ cor, jogadores, data, numeroRodada }: ElencoCardPro
   const tema = TEMAS[cor];
   const media = jogadores.length ? jogadores.reduce((s, j) => s + j.nota, 0) / jogadores.length : 0;
 
-  const porPos = (p: Posicao) => jogadores.filter((j) => j.posicao === p);
-  const ata = porPos("atacante");
-  const mei = porPos("meio");
-  const def = porPos("defensor");
-  const banco = jogadores.filter((j) => !j.posicao);
+  // Distribui em três linhas equilibradas (ex.: 9 → 3-3-3, 8 → 3-3-2), mantendo cada
+  // um na sua posição natural e só movendo o necessário para bater as metas. Quando
+  // precisa mover: a MAIOR nota sobe para o ataque e a MENOR desce para a defesa.
+  const n = jogadores.length;
+  const base = Math.floor(n / 3);
+  const resto = n % 3;
+  const meta = { defesa: base + (resto > 0 ? 1 : 0), meio: base + (resto > 1 ? 1 : 0), ataque: base };
+
+  const linhas: Record<"ataque" | "meio" | "defesa", JogadorEscalado[]> = {
+    ataque: jogadores.filter((j) => j.posicao === "atacante"),
+    meio: jogadores.filter((j) => j.posicao === "meio" || !j.posicao),
+    defesa: jogadores.filter((j) => j.posicao === "defensor"),
+  };
+  const chaves = ["ataque", "meio", "defesa"] as const;
+
+  // Só mexe enquanto alguma linha estiver abaixo da meta (nada a fazer se já equilibrado).
+  for (let guarda = 0; guarda < 60; guarda++) {
+    const faltando = chaves.find((k) => linhas[k].length < meta[k]);
+    if (!faltando) break;
+    const sobrando = chaves.filter((k) => linhas[k].length > meta[k]);
+    if (!sobrando.length) break;
+    const candidatos = sobrando.flatMap((k) => linhas[k].map((j) => ({ j, k })));
+
+    let escolha: { j: JogadorEscalado; k: (typeof chaves)[number] };
+    if (faltando === "ataque") {
+      escolha = candidatos.reduce((m, c) => (c.j.nota > m.j.nota ? c : m)); // maior nota sobe
+    } else if (faltando === "defesa") {
+      escolha = candidatos.reduce((m, c) => (c.j.nota < m.j.nota ? c : m)); // menor nota desce
+    } else if (linhas.ataque.length > meta.ataque) {
+      const menor = linhas.ataque.reduce((m, j) => (j.nota < m.nota ? j : m)); // desce o pior do ataque
+      escolha = { j: menor, k: "ataque" };
+    } else {
+      const maior = linhas.defesa.reduce((m, j) => (j.nota > m.nota ? j : m)); // sobe o melhor da defesa
+      escolha = { j: maior, k: "defesa" };
+    }
+    linhas[escolha.k].splice(linhas[escolha.k].indexOf(escolha.j), 1);
+    linhas[faltando].push(escolha.j);
+  }
+
+  const porNota = (a: JogadorEscalado, b: JogadorEscalado) => b.nota - a.nota || a.nome.localeCompare(b.nome);
+  const ataque = [...linhas.ataque].sort(porNota);
+  const meio = [...linhas.meio].sort(porNota);
+  const defesa = [...linhas.defesa].sort(porNota);
 
   // Número exibido na camisa: usa o do jogador ou uma sequência de reserva.
-  const ordem = [...ata, ...mei, ...def, ...banco];
-  const numeroDe = new Map(ordem.map((j, i) => [j.id, j.numero || String(i + 1)]));
+  const numeroDe = new Map(jogadores.map((j, i) => [j.id, j.numero || String(i + 1)]));
 
-  const filas = [ata, mei, def];
+  const filas = [ataque, meio, defesa];
 
   return (
     <div style={{ width: "100%", borderRadius: 22, overflow: "hidden", background: "#0a1526", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
@@ -256,22 +293,6 @@ export function ElencoCard({ cor, jogadores, data, numeroRodada }: ElencoCardPro
             ) : null,
           )}
         </div>
-
-        {/* Banco / sem posição */}
-        {banco.length > 0 && (
-          <div style={{ position: "relative", zIndex: 1, marginTop: 18, paddingTop: 14, borderTop: "1px dashed rgba(255,255,255,.2)" }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 8, textAlign: "center" }}>
-              Sem posição definida
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-              {banco.map((j) => (
-                <span key={j.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,.12)", padding: "4px 9px", borderRadius: 999 }}>
-                  {j.nome} <b style={{ color: "#fde047" }}>{j.nota.toFixed(1)}</b>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Rodapé */}
