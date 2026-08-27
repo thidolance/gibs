@@ -692,7 +692,7 @@ export default function ClassificacaoPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div className="flex flex-col items-center gap-2">
-                      <div ref={cardVermelhoRef} className="w-full overflow-hidden rounded-lg shadow-sm">
+                      <div ref={cardVermelhoRef} className="w-full max-w-[380px] overflow-hidden rounded-lg shadow-sm">
                         <ElencoCard
                           cor="vermelho"
                           jogadores={timeVermelho.map(paraEscalado)}
@@ -709,7 +709,7 @@ export default function ClassificacaoPage() {
                       </Button>
                     </div>
                     <div className="flex flex-col items-center gap-2">
-                      <div ref={cardAzulRef} className="w-full overflow-hidden rounded-lg shadow-sm">
+                      <div ref={cardAzulRef} className="w-full max-w-[380px] overflow-hidden rounded-lg shadow-sm">
                         <ElencoCard
                           cor="azul"
                           jogadores={timeAzul.map(paraEscalado)}
@@ -993,7 +993,7 @@ export default function ClassificacaoPage() {
 
       {/* Board oculto usado só para gerar a foto (estética do site público, últimos 5 jogos) */}
       <div aria-hidden className="pointer-events-none fixed -left-[9999px] top-0">
-        <div ref={capturaRef}>
+        <div ref={capturaRef} style={{ width: 600 }}>
           <PlacarFoto
             meta={`Gibs FC · ${nomeMes(mes).charAt(0) + nomeMes(mes).slice(1).toLowerCase()}`}
             titulo="Classificação"

@@ -135,7 +135,7 @@ export function PlacarFoto({
       style={{
         position: "relative",
         overflow: "hidden",
-        width: 520,
+        width: 600,
         background: "linear-gradient(180deg,rgba(12,20,46,.72),rgba(6,12,30,.55))",
         border: `1px solid ${COR.line2}`,
         borderRadius: 18,

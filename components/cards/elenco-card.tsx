@@ -1,4 +1,6 @@
-import { type CSSProperties, type ReactNode } from "react";
+"use client";
+
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Flame, TrendingDown } from "lucide-react";
 import { type Posicao } from "@/lib/types";
 import { dataBRCompleta } from "@/lib/utils";
@@ -105,6 +107,46 @@ function Selo({ tipo, children }: { tipo: "v" | "d"; children: ReactNode }) {
   return <span style={{ ...base, ...cor }}>{children}</span>;
 }
 
+/**
+ * Nome do jogador com largura fixa: mede se o nome inteiro cabe e, quando não
+ * couber, mostra só o primeiro nome (reticências como salvaguarda final).
+ */
+function NomeJogador({ nome }: { nome: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [texto, setTexto] = useState(nome);
+
+  // Sempre parte do nome completo quando o nome muda.
+  useEffect(() => setTexto(nome), [nome]);
+
+  // Se transbordar, cai para o primeiro nome (converge em no máximo 2 renders).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const primeiro = nome.trim().split(/\s+/)[0];
+    if (el.scrollWidth > el.clientWidth && texto !== primeiro) setTexto(primeiro);
+  });
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        maxWidth: 88,
+        fontSize: 12,
+        fontWeight: 800,
+        textTransform: "uppercase",
+        letterSpacing: "-.01em",
+        color: "#fff",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        textShadow: "0 1px 3px rgba(0,0,0,.6)",
+      }}
+    >
+      {texto}
+    </div>
+  );
+}
+
 /** Jogador na escalação: camisa + nome + nota. */
 function JogadorNoCampo({ j, id, cor, cor2, numero }: {
   j: JogadorEscalado;
@@ -114,24 +156,10 @@ function JogadorNoCampo({ j, id, cor, cor2, numero }: {
   numero: string;
 }) {
   return (
-    <div style={{ width: 84, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+    <div style={{ width: 90, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
       <Camisa id={id} cor={cor} cor2={cor2} numero={numero} seq={j.sequencia} seqDerrota={j.sequenciaDerrota} />
-      <div style={{ textAlign: "center", maxWidth: 90 }}>
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 800,
-            textTransform: "uppercase",
-            letterSpacing: "-.01em",
-            color: "#fff",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            textShadow: "0 1px 3px rgba(0,0,0,.6)",
-          }}
-        >
-          {j.nome}
-        </div>
+      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <NomeJogador nome={j.nome} />
         <span style={{ display: "inline-block", marginTop: 2, fontSize: 10.5, fontWeight: 900, color: "#052e16", background: "#fde047", padding: "0 6px", borderRadius: 999 }}>
           {j.nota.toFixed(1)}
         </span>
@@ -140,7 +168,7 @@ function JogadorNoCampo({ j, id, cor, cor2, numero }: {
   );
 }
 
-const linhaFila: CSSProperties = { display: "flex", justifyContent: "space-evenly", alignItems: "flex-start" };
+const linhaFila: CSSProperties = { display: "flex", flexWrap: "wrap", justifyContent: "space-evenly", alignItems: "flex-start", gap: "12px 2px" };
 const linhaCampo: CSSProperties = { position: "absolute", left: "50%", transform: "translateX(-50%)", borderColor: "rgba(255,255,255,.24)", borderStyle: "solid" };
 
 /**

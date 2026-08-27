@@ -282,7 +282,7 @@ export default function RankingPage() {
 
       {/* Board oculto usado só para gerar a foto (estética do site público, últimos 5 jogos) */}
       <div aria-hidden className="pointer-events-none fixed -left-[9999px] top-0">
-        <div ref={capturaRef}>
+        <div ref={capturaRef} style={{ width: 600 }}>
           <PlacarFoto
             meta="Gibs FC · Notas 6–10"
             titulo="Ranking"
