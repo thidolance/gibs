@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EstadoLoading } from "@/components/layout/estado-loading";
 import { ElencoCard, type JogadorEscalado } from "@/components/cards/elenco-card";
+import { PlacarFoto, type LinhaFoto } from "@/components/cards/placar-foto";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PassoNumero, Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
@@ -44,6 +45,7 @@ import {
   NOTA_BASE,
   classificacaoMensal,
   getMensalMes,
+  jogadoresUltimasRodadas,
   notasJogadores,
   rodadasOrdenadas,
   sortearTimes,
@@ -107,6 +109,24 @@ export default function ClassificacaoPage() {
   const notaDe = (id: string) => notas.get(id)?.nota ?? NOTA_BASE;
   const titulos = titulosPorJogador(estado);
   const ehCampeao = (id: string) => (titulos.get(id) ?? 0) > 0;
+
+  // Foto: só quem jogou nas últimas 5 rodadas do trimestral atual, renumerado.
+  const idsRecentes = jogadoresUltimasRodadas(estado.rodadas, 5);
+  const linhasFoto: LinhaFoto[] = classificacao
+    .filter((l) => idsRecentes.has(l.jogador.id))
+    .map((l) => ({
+      id: l.jogador.id,
+      nome: l.jogador.nome,
+      posicao: l.jogador.posicao,
+      campeao: ehCampeao(l.jogador.id),
+      destaque: String(l.pontos),
+      valores: [
+        { valor: l.vitorias },
+        { valor: l.empates },
+        { valor: l.derrotas },
+        { valor: l.jogos, esmaecido: true },
+      ],
+    }));
 
   /** Monta os dados de um jogador escalado para o card (nota, sequência, campeão). */
   const paraEscalado = (j: Jogador): JogadorEscalado => {
@@ -352,7 +372,7 @@ export default function ClassificacaoPage() {
     try {
       const url = await toPng(capturaRef.current, {
         pixelRatio: 3, // alta resolução para print nítido
-        backgroundColor: "#0a1226",
+        backgroundColor: "#070d1f",
         cacheBust: true,
       });
       const link = document.createElement("a");
@@ -424,7 +444,7 @@ export default function ClassificacaoPage() {
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={baixarImagem} disabled={baixando || classificacao.length === 0}>
+            <Button variant="outline" onClick={baixarImagem} disabled={baixando || linhasFoto.length === 0}>
               <Download /> {baixando ? "Gerando..." : "Baixar imagem"}
             </Button>
             <Button variant="warning" onClick={encerrar} disabled={!lider}>
@@ -437,7 +457,6 @@ export default function ClassificacaoPage() {
             <Vazio texto="Nenhuma rodada registrada ainda. Escale os times abaixo para começar." />
           ) : (
             <div
-              ref={capturaRef}
               className="relative overflow-hidden rounded-xl bg-[linear-gradient(180deg,rgba(12,20,46,.96),rgba(6,12,30,.96))] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
             >
               {/* Barra de topo em gradiente (azul → vermelho), como no público */}
@@ -971,6 +990,21 @@ export default function ClassificacaoPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Board oculto usado só para gerar a foto (estética do site público, últimos 5 jogos) */}
+      <div aria-hidden className="pointer-events-none fixed -left-[9999px] top-0">
+        <div ref={capturaRef}>
+          <PlacarFoto
+            meta={`Gibs FC · ${nomeMes(mes).charAt(0) + nomeMes(mes).slice(1).toLowerCase()}`}
+            titulo="Classificação"
+            tituloSpan="Mensal"
+            destaqueLabel="Pts"
+            colunas={["V", "E", "D", "J"]}
+            linhas={linhasFoto}
+            legendaFim="Vitória = 3 pts · Empate = 1 pt"
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -611,6 +611,19 @@ export function partidasDoJogador(estado: Estado, jogadorId: string): PartidaJog
   return partidas.sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""));
 }
 
+/** Conjunto de jogadores que entraram em campo nas últimas `n` rodadas decididas. */
+export function jogadoresUltimasRodadas(rodadas: Rodada[], n = 5): Set<string> {
+  const recentes = [...rodadas]
+    .filter((r) => r.resultado !== "andamento")
+    .sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""))
+    .slice(0, n);
+  const ids = new Set<string>();
+  for (const r of recentes) {
+    for (const id of [...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]) ids.add(id);
+  }
+  return ids;
+}
+
 // ── Sorteio equilibrado de times ─────────────────────────────────────────────
 // Distribui os jogadores em dois times por posição (defensor/meio/atacante/sem)
 // e, dentro de cada grupo, joga cada jogador no time de menor soma de nota — o que

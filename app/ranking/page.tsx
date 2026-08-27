@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EstadoLoading } from "@/components/layout/estado-loading";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { JogadorModal } from "@/components/ranking/jogador-modal";
+import { PlacarFoto, type LinhaFoto } from "@/components/cards/placar-foto";
 import { Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
-import { partidasDoJogador, rankingJogadores } from "@/lib/calculos";
+import { jogadoresUltimasRodadas, partidasDoJogador, rankingJogadores } from "@/lib/calculos";
 import { POSICOES, type Posicao } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -47,11 +48,31 @@ export default function RankingPage() {
   const emSequencia = [...ranking].sort((a, b) => b.stats.sequencia - a.stats.sequencia)[0];
   const selecionado = selecionadoId ? ranking.find((l) => l.jogador.id === selecionadoId) : null;
 
+  // Foto: só quem jogou nas últimas 5 rodadas (atuais + arquivadas), renumerado.
+  const idsRecentes = jogadoresUltimasRodadas([...estado.rodadas, ...(estado.rodadasArquivadas ?? [])], 5);
+  const linhasFoto: LinhaFoto[] = ranking
+    .filter((l) => idsRecentes.has(l.jogador.id))
+    .map((l) => ({
+      id: l.jogador.id,
+      nome: l.jogador.nome,
+      posicao: l.jogador.posicao,
+      campeao: l.titulos > 0,
+      destaque: l.stats.nota.toFixed(1),
+      mov: l.movimento,
+      seq: l.stats.sequencia,
+      seqDerrota: l.stats.sequenciaDerrota,
+      valores: [
+        { valor: l.stats.vitorias },
+        { valor: l.stats.derrotas, esmaecido: true },
+        { valor: l.stats.jogos, esmaecido: true },
+      ],
+    }));
+
   async function baixarImagem() {
     if (!capturaRef.current) return;
     setBaixando(true);
     try {
-      const url = await toPng(capturaRef.current, { pixelRatio: 3, backgroundColor: "#0a1226", cacheBust: true });
+      const url = await toPng(capturaRef.current, { pixelRatio: 3, backgroundColor: "#070d1f", cacheBust: true });
       const link = document.createElement("a");
       link.download = "ranking-gibs.png";
       link.href = url;
@@ -108,7 +129,7 @@ export default function RankingPage() {
               é em relação à rodada anterior.
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={baixarImagem} disabled={baixando || ranking.length === 0}>
+          <Button variant="outline" onClick={baixarImagem} disabled={baixando || linhasFoto.length === 0}>
             <Download /> {baixando ? "Gerando..." : "Baixar imagem"}
           </Button>
         </CardHeader>
@@ -117,7 +138,6 @@ export default function RankingPage() {
             <Vazio texto="Nenhuma partida registrada ainda. Registre rodadas na aba Classificação para gerar as notas." />
           ) : (
             <div
-              ref={capturaRef}
               className="relative overflow-hidden rounded-xl bg-[linear-gradient(180deg,rgba(12,20,46,.96),rgba(6,12,30,.96))] p-5 text-white shadow-[0_18px_40px_-12px_rgba(10,23,48,.6)] max-md:p-4"
             >
               {/* Barra de topo em gradiente (azul → roxo → vermelho), igual à Classificação */}
@@ -259,6 +279,23 @@ export default function RankingPage() {
           onClose={() => setSelecionadoId(null)}
         />
       )}
+
+      {/* Board oculto usado só para gerar a foto (estética do site público, últimos 5 jogos) */}
+      <div aria-hidden className="pointer-events-none fixed -left-[9999px] top-0">
+        <div ref={capturaRef}>
+          <PlacarFoto
+            meta="Gibs FC · Notas 6–10"
+            titulo="Ranking"
+            tituloSpan="Jogadores"
+            destaqueLabel="Nota"
+            colunas={["V", "D", "J"]}
+            temMov
+            temSeq
+            linhas={linhasFoto}
+            legendaFim="Vitórias seguidas +0,2/+0,3… · Derrotas −0,1/−0,2… · Campeão +0,5 · Faltou −0,1 · piso 6"
+          />
+        </div>
+      </div>
     </div>
   );
 }
