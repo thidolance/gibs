@@ -310,6 +310,7 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 
   for (const r of estado.rodadas) {
     if (r.resultado === "andamento") continue; // ainda sem resultado: não pontua
+    const ausentes = new Set(r.ausentes ?? []);
     const times: [string[], boolean][] = [
       [r.timeVermelho ?? [], r.resultado === "vermelho"],
       [r.timeAzul ?? [], r.resultado === "azul"],
@@ -317,6 +318,7 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
     for (const [jogadores, venceu] of times) {
       for (const id of jogadores) {
         if (!mensalistas.has(id)) continue; // avulso não pontua no mensal
+        if (ausentes.has(id)) continue; // escalado que faltou não joga nem pontua
         const s = garantir(id);
         s.jogos++;
         if (r.resultado === "empate") {
@@ -357,7 +359,7 @@ export const NOTA_BASE = 6;
 export const NOTA_MIN = 6; // piso: a nota nunca baixa de 6
 export const NOTA_MAX = 10;
 export const PASSO_CAMPEAO = 0.5;
-export const PASSO_AUSENCIA = 0.1; // perde por rodada que rolou desde a estreia e não jogou
+export const PASSO_AUSENCIA = 0.1; // perde por rodada em que foi escalado e faltou
 
 function limitar(valor: number, min: number, max: number) {
   return Math.min(max, Math.max(min, valor));
@@ -408,7 +410,7 @@ export interface EstatisticaJogador {
   derrotas: number;
   empates: number;
   jogos: number;
-  /** Rodadas que rolaram desde a estreia e o jogador não jogou. */
+  /** Rodadas em que o jogador foi escalado e faltou. */
   ausencias: number;
   /** Combo atual de vitórias seguidas (zera ao perder ou faltar). */
   sequencia: number;
@@ -439,27 +441,25 @@ function novoStat(): EstatisticaJogador {
 /**
  * Percorre as rodadas em ordem e apura, para cada jogador: vitórias/derrotas/empates,
  * o combo de vitórias seguidas (empate mantém, derrota e falta zeram)
- * e as ausências desde a estreia.
+ * e as ausências (rodadas em que foi escalado e faltou).
  */
 export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, EstatisticaJogador> {
   const stats = new Map<string, EstatisticaJogador>();
-  const jaEstreou = new Set<string>();
 
   const decididas = rodadas
     .filter((r) => r.resultado !== "andamento")
     .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
 
   for (const r of decididas) {
-    const presentes = new Set<string>([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]);
+    const ausentes = new Set(r.ausentes ?? []);
 
-    // Quem já estreou e não veio: falta. Tira 0,1 (ausência) e zera o combo de VITÓRIA,
-    // mas o combo de DERROTA continua (não zera).
-    for (const id of jaEstreou) {
-      if (!presentes.has(id)) {
-        const s = stats.get(id)!;
-        s.ausencias++;
-        s.sequencia = 0;
-      }
+    // Ausência só pune quem foi escalado para a rodada e não compareceu (r.ausentes).
+    // Tira 0,1 e zera o combo de VITÓRIA; o combo de DERROTA continua (não zera).
+    for (const id of ausentes) {
+      if (!stats.has(id)) stats.set(id, novoStat());
+      const s = stats.get(id)!;
+      s.ausencias++;
+      s.sequencia = 0;
     }
 
     const times: [string[], boolean][] = [
@@ -468,8 +468,8 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
     ];
     for (const [jogadores, venceu] of times) {
       for (const id of jogadores) {
+        if (ausentes.has(id)) continue; // escalado que faltou não joga nem pontua
         if (!stats.has(id)) stats.set(id, novoStat());
-        jaEstreou.add(id);
         const s = stats.get(id)!;
         s.jogos++;
         if (r.resultado === "empate") {
@@ -594,6 +594,7 @@ export function partidasDoJogador(estado: Estado, jogadorId: string): PartidaJog
   const partidas: PartidaJogador[] = [];
   for (const r of todas) {
     if (r.resultado === "andamento") continue;
+    if ((r.ausentes ?? []).includes(jogadorId)) continue; // escalado que faltou não jogou
     const noVermelho = (r.timeVermelho ?? []).includes(jogadorId);
     const noAzul = (r.timeAzul ?? []).includes(jogadorId);
     if (!noVermelho && !noAzul) continue;
@@ -611,6 +612,61 @@ export function partidasDoJogador(estado: Estado, jogadorId: string): PartidaJog
   return partidas.sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""));
 }
 
+export interface PontoEvolucao {
+  data: string;
+  /** Nº da rodada na trajetória do jogador (1..N, só rodadas que o afetaram). */
+  rodada: number;
+  nota: number;
+  resultado: "vitoria" | "derrota" | "empate" | "ausencia";
+}
+
+/**
+ * Evolução da nota do jogador rodada a rodada — só rodadas decididas que o afetaram
+ * (jogou ou foi escalado e faltou), da mais antiga para a mais recente. Usa exatamente
+ * a mesma fórmula da nota do ranking, então o último ponto bate com a nota atual.
+ * O bônus de título entra como constante (não há rodada associada ao título).
+ */
+export function evolucaoNotaJogador(estado: Estado, jogadorId: string): PontoEvolucao[] {
+  const todas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])]
+    .filter((r) => r.resultado !== "andamento")
+    .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
+  const campeonatos = campeonatosPorJogador(estado).get(jogadorId) ?? 0;
+
+  const s = novoStat();
+  const pontos: PontoEvolucao[] = [];
+  for (const r of todas) {
+    const ausente = (r.ausentes ?? []).includes(jogadorId);
+    const noVermelho = (r.timeVermelho ?? []).includes(jogadorId);
+    const noAzul = (r.timeAzul ?? []).includes(jogadorId);
+
+    let resultado: PontoEvolucao["resultado"];
+    if (ausente) {
+      s.ausencias++;
+      s.sequencia = 0; // faltar zera o combo de vitória
+      resultado = "ausencia";
+    } else if (noVermelho || noAzul) {
+      const time = noVermelho ? "vermelho" : "azul";
+      if (r.resultado === "empate") {
+        resultado = "empate"; // neutro
+      } else if (r.resultado === time) {
+        s.sequencia++;
+        s.pontosVitoria += pontosVitoriaSeguida(s.sequencia);
+        s.sequenciaDerrota = 0;
+        resultado = "vitoria";
+      } else {
+        s.sequenciaDerrota++;
+        s.pontosDerrota += pontosDerrotaSeguida(s.sequenciaDerrota);
+        s.sequencia = 0;
+        resultado = "derrota";
+      }
+    } else {
+      continue; // rodada não envolveu o jogador
+    }
+    pontos.push({ data: r.data, rodada: pontos.length + 1, nota: calcularNota(s, campeonatos), resultado });
+  }
+  return pontos;
+}
+
 /** Conjunto de jogadores que entraram em campo nas últimas `n` rodadas decididas. */
 export function jogadoresUltimasRodadas(rodadas: Rodada[], n = 5): Set<string> {
   const recentes = [...rodadas]
@@ -619,7 +675,10 @@ export function jogadoresUltimasRodadas(rodadas: Rodada[], n = 5): Set<string> {
     .slice(0, n);
   const ids = new Set<string>();
   for (const r of recentes) {
-    for (const id of [...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]) ids.add(id);
+    const ausentes = new Set(r.ausentes ?? []);
+    for (const id of [...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]) {
+      if (!ausentes.has(id)) ids.add(id); // quem faltou não entra na foto
+    }
   }
   return ids;
 }

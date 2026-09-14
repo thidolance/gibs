@@ -63,6 +63,17 @@ const POS_COR: Record<Posicao, string> = {
   atacante: "bg-red-light text-red",
 };
 
+/** Rótulo/cor de cada resultado — usado no form (resultado derivado) e no histórico. */
+const RESULTADO_INFO: Record<ResultadoRodada, { rotulo: string; emoji: string; classe: string }> = {
+  andamento: { rotulo: "Em andamento", emoji: "⏳", classe: "bg-surface-2 text-muted" },
+  vermelho: { rotulo: "Vermelho venceu", emoji: "🔴", classe: "bg-red-light text-red" },
+  azul: { rotulo: "Azul venceu", emoji: "🔵", classe: "bg-blue-light text-blue" },
+  empate: { rotulo: "Empate", emoji: "🤝", classe: "bg-warning-bg text-warning" },
+};
+
+// Emoji ao lado do nome de quem foi escalado e faltou (a "bola murcha").
+const EMOJI_AUSENTE = "⚽💨";
+
 // Tags de posição para fundo escuro (usadas no scoreboard baixável).
 const POS_TAG_DARK: Record<Posicao, string> = {
   defensor: "bg-blue-3/25 text-blue-light",
@@ -77,15 +88,26 @@ function sugestaoTrimestre(mes: string): string {
   return `${trimestre}º Trimestre ${ano}`;
 }
 
+/** O resultado é determinado pelo placar. Sem os dois placares, a rodada fica "em andamento". */
+function resultadoDoPlacar(placarV: string, placarA: string): ResultadoRodada {
+  if (placarV === "" || placarA === "") return "andamento";
+  const v = Number(placarV);
+  const a = Number(placarA);
+  if (v > a) return "vermelho";
+  if (a > v) return "azul";
+  return "empate";
+}
+
 export default function ClassificacaoPage() {
   const { estado, carregando, atualizarEstado } = useEstado();
   const [data, setData] = useState(tercaDaSemana());
   const [selManual, setSelManual] = useState<Set<string> | null>(null);
   const [times, setTimes] = useState<Record<string, Time>>({});
-  const [resultado, setResultado] = useState<ResultadoRodada>("andamento");
   const [placarV, setPlacarV] = useState("");
   const [placarA, setPlacarA] = useState("");
+  const [ausentes, setAusentes] = useState<Set<string>>(new Set());
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [formAberto, setFormAberto] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [baixandoCard, setBaixandoCard] = useState<Time | null>(null);
   const carrosselRef = useRef<HTMLDivElement>(null);
@@ -156,6 +178,11 @@ export default function ClassificacaoPage() {
   const timeAzul = estado.jogadores.filter((j) => times[j.id] === "azul").sort(porPosNota);
   const sorteado = timeVermelho.length > 0 || timeAzul.length > 0;
 
+  // O resultado sai do placar: enquanto não tiver os dois placares, a rodada fica "em andamento".
+  const resultado = resultadoDoPlacar(placarV, placarA);
+  // Todos os escalados (para a lista de faltas), na ordem vermelho depois azul.
+  const escalados = [...timeVermelho, ...timeAzul];
+
   // Número de ordem da rodada (posição cronológica desta data entre todas já registradas).
   const todasAsDatas = [...estado.rodadas, ...(estado.rodadasArquivadas ?? [])].map((r) => r.data).filter(Boolean);
   const numeroRodada = [...new Set([...todasAsDatas, data])].sort().indexOf(data) + 1;
@@ -218,16 +245,38 @@ export default function ClassificacaoPage() {
       base.delete(jogadorId);
       return base;
     });
+    setAusentes((atual) => {
+      const base = new Set(atual);
+      base.delete(jogadorId);
+      return base;
+    });
+  }
+
+  /** Marca/desmarca um escalado como ausente (foi escalado e faltou). */
+  function alternarAusente(jogadorId: string) {
+    setAusentes((atual) => {
+      const base = new Set(atual);
+      if (base.has(jogadorId)) base.delete(jogadorId);
+      else base.add(jogadorId);
+      return base;
+    });
   }
 
   function resetarFormulario() {
     setEditandoId(null);
     setSelManual(null);
     setTimes({});
-    setResultado("andamento");
     setPlacarV("");
     setPlacarA("");
+    setAusentes(new Set());
     setData(tercaDaSemana());
+    setFormAberto(false);
+  }
+
+  /** Abre o formulário limpo para criar uma nova rodada. */
+  function abrirNovaRodada() {
+    resetarFormulario();
+    setFormAberto(true);
   }
 
   function editarRodada(r: (typeof historico)[number]) {
@@ -237,10 +286,11 @@ export default function ClassificacaoPage() {
     setEditandoId(r.id);
     setSelManual(new Set([...(r.timeVermelho ?? []), ...(r.timeAzul ?? [])]));
     setTimes(mapa);
-    setResultado(r.resultado);
     setPlacarV(r.placarVermelho?.toString() ?? "");
     setPlacarA(r.placarAzul?.toString() ?? "");
+    setAusentes(new Set(r.ausentes ?? []));
     setData(r.data);
+    setFormAberto(true);
     formularioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -289,6 +339,7 @@ export default function ClassificacaoPage() {
       alert("Cada time precisa de pelo menos um jogador.");
       return;
     }
+    const idsAusentes = escalados.filter((j) => ausentes.has(j.id)).map((j) => j.id);
     const dados = {
       data,
       timeVermelho: timeVermelho.map((j) => j.id),
@@ -296,6 +347,7 @@ export default function ClassificacaoPage() {
       resultado,
       ...(placarV !== "" ? { placarVermelho: Number(placarV) } : {}),
       ...(placarA !== "" ? { placarAzul: Number(placarA) } : {}),
+      ...(idsAusentes.length ? { ausentes: idsAusentes } : {}),
     };
     if (editandoId) {
       const id = editandoId;
@@ -304,14 +356,10 @@ export default function ClassificacaoPage() {
       alert("Rodada atualizada e classificação recalculada.");
     } else {
       atualizarEstado((atual) => adicionarRodada(atual, dados));
-      setSelManual(null);
-      setTimes({});
-      setResultado("andamento");
-      setPlacarV("");
-      setPlacarA("");
+      resetarFormulario();
       alert(
         resultado === "andamento"
-          ? "Rodada sorteada e divulgada como próxima rodada. Edite depois para lançar o resultado."
+          ? "Rodada sorteada e divulgada como próxima rodada. Edite depois para lançar o placar."
           : "Rodada registrada e classificação atualizada.",
       );
     }
@@ -568,22 +616,53 @@ export default function ClassificacaoPage() {
 
       {/* ── Nova rodada / edição ── */}
       <Card ref={formularioRef} className={cn(editandoId && "border-warning ring-1 ring-warning/40")}>
+        {!formAberto ? (
+          // Recolhido: só o botão de abrir uma nova rodada.
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Swords className="size-5 text-blue" /> Rodadas
+              </CardTitle>
+              <CardDescription>Sorteie os times, lance o placar e registre uma nova rodada.</CardDescription>
+            </div>
+            <Button onClick={abrirNovaRodada} disabled={estado.jogadores.length === 0}>
+              <Plus /> Nova rodada
+            </Button>
+          </CardHeader>
+        ) : (
+          <>
         <CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               {editandoId ? <Pencil className="size-4 text-warning" /> : <PassoNumero numero={1} />}
-              {editandoId ? "Editar rodada" : "Nova rodada"}
+              {editandoId ? (
+                <>
+                  Editar rodada
+                  <Badge className="bg-warning-bg text-warning">
+                    {dataBR(data)} · {calcularDiaSemana(data)}
+                  </Badge>
+                </>
+              ) : (
+                "Nova rodada"
+              )}
             </CardTitle>
             <CardDescription>
-              <span className="font-bold">Sorteie os times</span> (equilíbrio por posição e nota), ajuste manualmente se
-              quiser, informe o resultado e {editandoId ? "salve as alterações." : "registre."}
+              {editandoId ? (
+                <>
+                  Editando a rodada de <span className="font-bold">{dataBR(data)}</span>. Ajuste os times/placar e salve as
+                  alterações.
+                </>
+              ) : (
+                <>
+                  <span className="font-bold">Sorteie os times</span> (equilíbrio por posição e nota), ajuste manualmente
+                  se quiser, lance o placar e registre.
+                </>
+              )}
             </CardDescription>
           </div>
-          {editandoId && (
-            <Button variant="ghost" onClick={resetarFormulario}>
-              <X /> Cancelar edição
-            </Button>
-          )}
+          <Button variant="ghost" onClick={resetarFormulario}>
+            <X /> {editandoId ? "Cancelar edição" : "Fechar"}
+          </Button>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {estado.jogadores.length === 0 ? (
@@ -729,10 +808,13 @@ export default function ClassificacaoPage() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                  Placar da partida <span className="font-normal normal-case">(opcional)</span>
-                </span>
+              {/* Placar → resultado. Não precisa marcar quem venceu: o placar determina.
+                  Sem os dois placares, a rodada fica "em andamento". */}
+              <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-2 p-3.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Placar e resultado</span>
+                  <span className="text-[11.5px] text-muted">— o resultado sai do placar</span>
+                </div>
                 <div className="flex items-center justify-center gap-4 py-1">
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[11px] font-bold text-red">🔴 Vermelho</span>
@@ -742,7 +824,7 @@ export default function ClassificacaoPage() {
                       inputMode="numeric"
                       value={placarV}
                       onChange={(e) => setPlacarV(e.target.value)}
-                      placeholder="0"
+                      placeholder="—"
                       className="h-14 w-20 rounded-md border-2 border-red/40 bg-white text-center text-2xl font-extrabold text-red outline-none focus:border-red focus:shadow-[0_0_0_3px_rgba(220,38,38,.18)]"
                     />
                   </div>
@@ -755,37 +837,49 @@ export default function ClassificacaoPage() {
                       inputMode="numeric"
                       value={placarA}
                       onChange={(e) => setPlacarA(e.target.value)}
-                      placeholder="0"
+                      placeholder="—"
                       className="h-14 w-20 rounded-md border-2 border-blue-3/40 bg-white text-center text-2xl font-extrabold text-blue outline-none focus:border-blue-3 focus:shadow-[0_0_0_3px_rgba(59,130,246,.18)]"
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Resultado</span>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["andamento", "⏳ Em andamento", "bg-muted text-white"],
-                      ["vermelho", "🔴 Vermelho venceu", "bg-red text-white"],
-                      ["empate", "🤝 Empate", "bg-warning text-white"],
-                      ["azul", "🔵 Azul venceu", "bg-blue text-white"],
-                    ] as const
-                  ).map(([valor, rotulo, ativo]) => (
-                    <button
-                      key={valor}
-                      onClick={() => setResultado(valor)}
-                      className={cn(
-                        "rounded-sm border px-4 py-2 text-[13px] font-bold transition-colors",
-                        resultado === valor ? ativo : "border-border-2 bg-white text-text-2 hover:border-blue-3",
-                      )}
-                    >
-                      {rotulo}
-                    </button>
-                  ))}
+                <div className="flex justify-center">
+                  <Badge className={cn("text-[13px]", RESULTADO_INFO[resultado].classe)}>
+                    {RESULTADO_INFO[resultado].emoji} {RESULTADO_INFO[resultado].rotulo}
+                  </Badge>
                 </div>
               </div>
+
+              {/* Faltas: escalados que não compareceram (perdem 0,1 na nota e não pontuam). */}
+              {escalados.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                    Faltas{" "}
+                    <span className="font-normal normal-case">
+                      (escalado que não foi — perde 0,1 na nota e não conta na partida)
+                    </span>
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {escalados.map((j) => {
+                      const faltou = ausentes.has(j.id);
+                      return (
+                        <button
+                          key={j.id}
+                          type="button"
+                          onClick={() => alternarAusente(j.id)}
+                          className={cn(
+                            "rounded-sm border px-3 py-1.5 text-[13px] font-semibold transition-colors",
+                            faltou
+                              ? "border-danger bg-danger-bg text-danger line-through"
+                              : "border-border-2 bg-white text-text-2 hover:border-blue-3",
+                          )}
+                        >
+                          {j.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button variant={editandoId ? "warning" : "primary"} onClick={salvarRodada}>
@@ -808,6 +902,8 @@ export default function ClassificacaoPage() {
             </>
           )}
         </CardContent>
+          </>
+        )}
       </Card>
 
       {/* ── Histórico / carrossel ── */}
@@ -840,14 +936,14 @@ export default function ClassificacaoPage() {
               className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5"
             >
               {historico.map((r) => {
-                const cor =
-                  r.resultado === "vermelho"
-                    ? { rotulo: "Vermelho venceu", classe: "bg-red-light text-red", emoji: "🔴" }
-                    : r.resultado === "azul"
-                      ? { rotulo: "Azul venceu", classe: "bg-blue-light text-blue", emoji: "🔵" }
-                      : r.resultado === "andamento"
-                        ? { rotulo: "Em andamento", classe: "bg-surface-2 text-muted", emoji: "⏳" }
-                        : { rotulo: "Empate", classe: "bg-warning-bg text-warning", emoji: "🤝" };
+                const cor = RESULTADO_INFO[r.resultado];
+                const faltou = new Set(r.ausentes ?? []);
+                const linhaNome = (id: string) => (
+                  <li key={id} className={cn(faltou.has(id) && "text-danger line-through")}>
+                    {faltou.has(id) && `${EMOJI_AUSENTE} `}
+                    {nomeJogador(id)}
+                  </li>
+                );
                 return (
                   <div
                     key={r.id}
@@ -885,19 +981,11 @@ export default function ClassificacaoPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-sm border border-red/25 bg-red-light/40 p-2">
                         <strong className="mb-1 block text-red">🔴 Vermelho</strong>
-                        <ul className="flex flex-col gap-0.5 text-text-2">
-                          {(r.timeVermelho ?? []).map((id) => (
-                            <li key={id}>{nomeJogador(id)}</li>
-                          ))}
-                        </ul>
+                        <ul className="flex flex-col gap-0.5 text-text-2">{(r.timeVermelho ?? []).map(linhaNome)}</ul>
                       </div>
                       <div className="rounded-sm border border-blue-3/25 bg-blue-light/40 p-2">
                         <strong className="mb-1 block text-blue">🔵 Azul</strong>
-                        <ul className="flex flex-col gap-0.5 text-text-2">
-                          {(r.timeAzul ?? []).map((id) => (
-                            <li key={id}>{nomeJogador(id)}</li>
-                          ))}
-                        </ul>
+                        <ul className="flex flex-col gap-0.5 text-text-2">{(r.timeAzul ?? []).map(linhaNome)}</ul>
                       </div>
                     </div>
                   </div>

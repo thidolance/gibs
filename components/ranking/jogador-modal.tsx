@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { Crown, Flame, TrendingDown, Trophy, X } from "lucide-react";
-import type { LinhaRanking, PartidaJogador } from "@/lib/calculos";
+import type { LinhaRanking, PartidaJogador, PontoEvolucao } from "@/lib/calculos";
 import { type Posicao } from "@/lib/types";
 import { cn, dataBR } from "@/lib/utils";
+import { NotaEvolucaoChart } from "@/components/ranking/nota-evolucao-chart";
 
 const POS_ABREV: Record<Posicao, string> = { defensor: "DEF", meio: "MEI", atacante: "ATA" };
 const POS_COR: Record<Posicao, string> = {
@@ -22,6 +23,7 @@ const RESULTADO = {
 interface JogadorModalProps {
   linha: LinhaRanking;
   partidas: PartidaJogador[];
+  evolucao: PontoEvolucao[];
   onClose: () => void;
 }
 
@@ -39,7 +41,7 @@ function Stat({ valor, rotulo, cor }: { valor: number | string; rotulo: string; 
  * Modal com o cartão do jogador: nota, resumo (J/V/D/E), sequência atual,
  * forma recente e a lista das últimas partidas. Mesmo tema escuro do placar.
  */
-export function JogadorModal({ linha, partidas, onClose }: JogadorModalProps) {
+export function JogadorModal({ linha, partidas, evolucao, onClose }: JogadorModalProps) {
   const { jogador, stats } = linha;
 
   // Fecha no Esc e trava o scroll do fundo enquanto o modal está aberto.
@@ -153,6 +155,31 @@ export function JogadorModal({ linha, partidas, onClose }: JogadorModalProps) {
               <span className="ml-1 text-[10px] font-bold uppercase tracking-wider text-white/45">aprov.</span>
             </div>
           </div>
+
+          {/* Evolução da nota ao longo das rodadas */}
+          {evolucao.length >= 2 && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">Evolução da nota</span>
+                <span className="text-[10px] font-semibold text-white/35">{evolucao.length} rodadas</span>
+              </div>
+              <NotaEvolucaoChart dados={evolucao} />
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9.5px] font-semibold uppercase tracking-wider text-white/40">
+                <span className="flex items-center gap-1">
+                  <span className="size-2 rounded-full bg-[#4ade80]" /> Vitória
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="size-2 rounded-full bg-[#f87171]" /> Derrota
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="size-2 rounded-full bg-[#e2e8f0]" /> Empate
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="size-2 rounded-full bg-[#fb923c]" /> Faltou
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Forma recente */}
           {formaRecente.length > 0 && (

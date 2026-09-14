@@ -23,7 +23,7 @@
     v = v || {};
     const jogadores = arr(v.jogadores).map((j) => ({ id: j.id, nome: j.nome || "", posicao: j.posicao }));
     const plc = (x) => (x === undefined || x === null || x === "" ? null : Number(x));
-    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), placarVermelho: plc(r.placarVermelho), placarAzul: plc(r.placarAzul) });
+    const rod = (r) => ({ id: r.id, data: r.data || "", resultado: r.resultado || "empate", timeVermelho: arr(r.timeVermelho), timeAzul: arr(r.timeAzul), placarVermelho: plc(r.placarVermelho), placarAzul: plc(r.placarAzul), ausentes: arr(r.ausentes) });
     return {
       mes: v.mes, jogadores,
       rodadas: arr(v.rodadas).map(rod),
@@ -59,26 +59,28 @@
     mensalistas.forEach(gar);
     for (const r of e.rodadas) {
       if (r.resultado === "andamento") continue;
+      const aus = new Set(r.ausentes || []);
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([t, w]) => {
-        for (const id of t) { if (!mensalistas.has(id)) continue; const s = gar(id); s.j++; if (r.resultado === "empate") { s.em++; s.pontos += 1; } else if (w) { s.v++; s.pontos += 3; } else s.d++; }
+        for (const id of t) { if (!mensalistas.has(id)) continue; if (aus.has(id)) continue; const s = gar(id); s.j++; if (r.resultado === "empate") { s.em++; s.pontos += 1; } else if (w) { s.v++; s.pontos += 3; } else s.d++; }
       });
     }
     return Object.entries(st).map(([id, s]) => ({ jogador: e.jogadores.find((j) => j.id === id), ...s }))
       .filter((x) => x.jogador).sort((a, b) => b.pontos - a.pontos || b.v - a.v || b.j - a.j || a.jogador.nome.localeCompare(b.jogador.nome));
   }
 
-  // Percorre as rodadas em ordem: apura V/D/E, combo de vitórias
-  // seguidas (empate mantém, derrota e falta zeram) e ausências desde a estreia.
+  // Percorre as rodadas em ordem: apura V/D/E, combo de vitórias seguidas
+  // (empate mantém, derrota e falta zeram) e ausências (escalado que faltou).
   function estatisticas(rodadas) {
-    const t = {}; const estreou = {};
+    const t = {};
     const dec = rodadas.filter((r) => r.resultado !== "andamento").sort((a, b) => (a.data || "").localeCompare(b.data || ""));
     for (const r of dec) {
-      const pres = {}; (r.timeVermelho || []).concat(r.timeAzul || []).forEach((id) => pres[id] = 1);
-      for (const id in estreou) { if (!pres[id]) { t[id].aus++; t[id].seq = 0; } }
+      const aus = {}; (r.ausentes || []).forEach((id) => aus[id] = 1);
+      // Ausência só pune quem foi escalado e faltou: tira 0,1 e zera o combo de vitória.
+      for (const id in aus) { if (!t[id]) t[id] = novoStat(); t[id].aus++; t[id].seq = 0; }
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([tm, w]) => {
         (tm || []).forEach((id) => {
+          if (aus[id]) return; // escalado que faltou não joga nem pontua
           if (!t[id]) t[id] = novoStat();
-          estreou[id] = 1;
           const x = t[id]; x.j++;
           if (r.resultado === "empate") x.em++;
           else if (w) { x.v++; x.seq++; x.pv += comboV(x.seq); x.seqD = 0; }
@@ -116,6 +118,7 @@
     const out = [];
     for (const r of todas) {
       if (r.resultado === "andamento") continue;
+      if ((r.ausentes || []).includes(id)) continue; // escalado que faltou não jogou
       const noV = (r.timeVermelho || []).includes(id), noA = (r.timeAzul || []).includes(id);
       if (!noV && !noA) continue;
       const time = noV ? "vermelho" : "azul";
@@ -129,6 +132,52 @@
       out.push({ data: r.data, resultado, time, golsPro: gp, golsContra: gc });
     }
     return out.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+  }
+
+  // Evolução da nota do jogador rodada a rodada (só as que o afetaram: jogou ou faltou escalado).
+  // Mesma fórmula da nota do ranking, então o último ponto bate com a nota atual.
+  function evolucaoNota(e, id) {
+    const todas = e.rodadas.concat(e.rodadasArquivadas)
+      .filter((r) => r.resultado !== "andamento").sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    const camp = campeoesPorId(e)[id] || 0;
+    const s = novoStat();
+    const pts = [];
+    for (const r of todas) {
+      const ausente = (r.ausentes || []).includes(id);
+      const noV = (r.timeVermelho || []).includes(id), noA = (r.timeAzul || []).includes(id);
+      let res;
+      if (ausente) { s.aus++; s.seq = 0; res = "ausencia"; }
+      else if (noV || noA) {
+        const time = noV ? "vermelho" : "azul";
+        if (r.resultado === "empate") res = "empate";
+        else if (r.resultado === time) { s.seq++; s.pv += comboV(s.seq); s.seqD = 0; res = "vitoria"; }
+        else { s.seqD++; s.pd += comboD(s.seqD); s.seq = 0; res = "derrota"; }
+      } else continue;
+      pts.push({ data: r.data, rodada: pts.length + 1, nota: notaCalc(s, camp), resultado: res });
+    }
+    return pts;
+  }
+
+  // Aproveitamento em % (vitória 3, empate 1, sobre o total possível).
+  const aproveitamento = (s) => s.j ? Math.round(((s.v * 3 + s.em) / (s.j * 3)) * 100) : 0;
+
+  // Resumo dinâmico do ranking: escolhe o líder de cada critério (só entra quem tem dado).
+  function destaques(lista, camp) {
+    const comJogos = lista.filter((l) => l.stats.j > 0);
+    if (!comJogos.length) return [];
+    camp = camp || {};
+    const top = (arrLista, val, min) => { const m = arrLista.slice().sort((a, b) => val(b) - val(a))[0]; return m && val(m) >= (min || 1) ? m : null; };
+    const out = [];
+    const add = (l, cls, ic, rot, valor, leg) => { if (l) out.push({ cls, ic, rot, jogador: l.jogador.nome, valor, leg }); };
+    add(lista[0], "d-gold", "★", "Melhor nota", lista[0] ? lista[0].stats.nota.toFixed(1) : "", "líder do ranking");
+    const chamas = top(lista, (l) => l.stats.seq, 2); add(chamas, "d-fire", "🔥", "Pegando fogo", chamas && chamas.stats.seq, "vitórias seguidas");
+    const subiu = top(lista, (l) => l.mov, 1); add(subiu, "d-up", "▲", "Em ascensão", subiu && ("+" + subiu.mov), "posições na última rodada");
+    const aprov = top(comJogos, (l) => aproveitamento(l.stats), 1); add(aprov, "d-blue", "%", "Aproveitamento", aprov && (aproveitamento(aprov.stats) + "%"), aprov && (aprov.stats.j + " jogo" + (aprov.stats.j > 1 ? "s" : "")));
+    const vit = top(lista, (l) => l.stats.v, 1); add(vit, "d-green", "⚔", "Mais vitórias", vit && vit.stats.v, "no total");
+    const tit = top(lista, (l) => camp[l.jogador.id] || 0, 1); add(tit, "d-gold", "👑", "Mais títulos", tit && ((camp[tit.jogador.id] || 0) + "x"), "campeão trimestral");
+    const assiduo = top(lista, (l) => l.stats.j, 1); add(assiduo, "d-muted", "📅", "Mais assíduo", assiduo && assiduo.stats.j, "rodadas disputadas");
+    const queda = top(lista, (l) => l.stats.seqD, 2); add(queda, "d-red", "▼", "Precisa reagir", queda && queda.stats.seqD, "derrotas seguidas");
+    return out;
   }
 
   // ── Header (escudo central + menu simétrico + próxima rodada) ──
@@ -227,7 +276,7 @@
 
   window.GIBS = {
     DB_URL, LOJA_URL, esc, nomeMes, dataBR, dataExt, dinheiro, POS,
-    classificacao, ranking, campeoesPorId, coroa, seqBadge, partidasDoJogador,
+    classificacao, ranking, campeoesPorId, coroa, seqBadge, partidasDoJogador, evolucaoNota, destaques,
     carregar() {
       return fetch(DB_URL).then((r) => r.json()).then((d) => {
         const estado = normalizar(d);

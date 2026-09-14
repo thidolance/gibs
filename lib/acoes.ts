@@ -83,6 +83,7 @@ export function removerJogador(estado: Estado, id: string): Estado {
     ...r,
     timeVermelho: (r.timeVermelho ?? []).filter((x) => x !== id),
     timeAzul: (r.timeAzul ?? []).filter((x) => x !== id),
+    ausentes: (r.ausentes ?? []).filter((x) => x !== id),
   });
 
   return {

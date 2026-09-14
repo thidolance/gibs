@@ -44,6 +44,9 @@ export interface Rodada {
   /** Placar da partida por time (não influencia a nota, é só o registro do jogo). */
   placarVermelho?: number;
   placarAzul?: number;
+  /** Escalados que faltaram: eram esperados para a rodada e não compareceram.
+   *  Só estes perdem ponto por ausência na nota (não jogam nem pontuam). */
+  ausentes?: string[];
 }
 
 export interface CampeaoTrimestral {

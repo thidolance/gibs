@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EstadoLoading } from "@/components/layout/estado-loading";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { JogadorModal } from "@/components/ranking/jogador-modal";
+import { DestaquesRanking } from "@/components/ranking/destaques-ranking";
 import { PlacarFoto, type LinhaFoto } from "@/components/cards/placar-foto";
 import { Vazio } from "@/components/shared/list-ui";
 import { useEstado } from "@/lib/estado-context";
-import { jogadoresUltimasRodadas, partidasDoJogador, rankingJogadores } from "@/lib/calculos";
+import { evolucaoNotaJogador, jogadoresUltimasRodadas, partidasDoJogador, rankingJogadores } from "@/lib/calculos";
 import { POSICOES, type Posicao } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -272,10 +273,30 @@ export default function RankingPage() {
         </CardContent>
       </Card>
 
+      {/* ── Resumo dinâmico da pontuação ── */}
+      {ranking.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="size-5 text-warning" />
+              Destaques da temporada
+            </CardTitle>
+            <CardDescription>
+              Um resumo de quem está brilhando no ranking. Toque em um jogador na tabela para ver a ficha e a evolução da
+              nota.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DestaquesRanking ranking={ranking} />
+          </CardContent>
+        </Card>
+      )}
+
       {selecionado && (
         <JogadorModal
           linha={selecionado}
           partidas={partidasDoJogador(estado, selecionado.jogador.id)}
+          evolucao={evolucaoNotaJogador(estado, selecionado.jogador.id)}
           onClose={() => setSelecionadoId(null)}
         />
       )}
