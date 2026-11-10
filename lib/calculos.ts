@@ -350,10 +350,11 @@ export function classificacaoMensal(estado: Estado): LinhaClassificacao[] {
 }
 
 // ── Nota e ranking de jogadores ──────────────────────────────────────────────
-// Todos começam em NOTA_BASE (6). Vitória sobe, derrota desce e cada título de
-// campeão soma um bônus — sempre travado no intervalo [NOTA_MIN, NOTA_MAX].
-// Empate é neutro. A nota usa TODAS as rodadas já jogadas (atuais + arquivadas),
-// então ela sobrevive ao encerramento de um trimestral.
+// Todos começam em NOTA_BASE (6). A nota é um saldo CORRENTE travado em [6, 10] e
+// atualizado a cada rodada: vitória sobe, derrota e ausência descem (empate é neutro)
+// e cada título soma um bônus. Como a trava age rodada a rodada, derrota não acumula
+// dívida abaixo do piso — ao voltar a vencer a nota sobe na hora. Usa TODAS as rodadas
+// já jogadas (atuais + arquivadas), então sobrevive ao encerramento de um trimestral.
 
 export const NOTA_BASE = 6;
 export const NOTA_MIN = 6; // piso: a nota nunca baixa de 6
@@ -375,16 +376,14 @@ function pontosDerrotaSeguida(sequencia: number) {
   return 0.1 * sequencia;
 }
 
-/** Nota = base + combo de vitórias + títulos − combo de derrotas − ausências, travada em [6, 10]. */
-function calcularNota(
-  s: { pontosVitoria: number; pontosDerrota: number; ausencias: number },
-  campeonatos: number,
-) {
-  return limitar(
-    NOTA_BASE + s.pontosVitoria + campeonatos * PASSO_CAMPEAO - s.pontosDerrota - s.ausencias * PASSO_AUSENCIA,
-    NOTA_MIN,
-    NOTA_MAX,
-  );
+/**
+ * A nota é um saldo CORRENTE em [6, 10], atualizado rodada a rodada e travado a cada
+ * passo. Como a trava age em cada rodada, uma derrota nunca afunda a nota abaixo de 6
+ * nem acumula dívida escondida: ao voltar a vencer, o jogador sobe na hora a partir do
+ * piso. O bônus de título entra por cima do saldo já travado.
+ */
+function comTitulos(nota: number, campeonatos: number) {
+  return limitar(nota + campeonatos * PASSO_CAMPEAO, NOTA_MIN, NOTA_MAX);
 }
 
 /** Quantas vezes cada jogador foi campeão. O quadro guarda por nome; casamos com o id
@@ -416,10 +415,7 @@ export interface EstatisticaJogador {
   sequencia: number;
   /** Combo atual de derrotas seguidas (zera ao vencer; falta NÃO zera). */
   sequenciaDerrota: number;
-  /** Soma do combo de vitórias acumulado. */
-  pontosVitoria: number;
-  /** Soma do combo de derrotas acumulado (valor positivo, subtraído da nota). */
-  pontosDerrota: number;
+  /** Saldo corrente da nota, travado em [6, 10] a cada rodada. */
   nota: number;
 }
 
@@ -432,8 +428,6 @@ function novoStat(): EstatisticaJogador {
     ausencias: 0,
     sequencia: 0,
     sequenciaDerrota: 0,
-    pontosVitoria: 0,
-    pontosDerrota: 0,
     nota: NOTA_BASE,
   };
 }
@@ -460,6 +454,7 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
       const s = stats.get(id)!;
       s.ausencias++;
       s.sequencia = 0;
+      s.nota = limitar(s.nota - PASSO_AUSENCIA, NOTA_MIN, NOTA_MAX);
     }
 
     const times: [string[], boolean][] = [
@@ -477,21 +472,19 @@ export function estatisticasPorRodadas(rodadas: Rodada[]): Map<string, Estatisti
         } else if (venceu) {
           s.vitorias++;
           s.sequencia++;
-          s.pontosVitoria += pontosVitoriaSeguida(s.sequencia); // 0,2 · 0,3 · 0,4 ...
+          s.nota = limitar(s.nota + pontosVitoriaSeguida(s.sequencia), NOTA_MIN, NOTA_MAX); // +0,2 · 0,3 · 0,4 ...
           s.sequenciaDerrota = 0; // vencer quebra a sequência de derrotas
         } else {
           s.derrotas++;
           s.sequenciaDerrota++;
-          s.pontosDerrota += pontosDerrotaSeguida(s.sequenciaDerrota); // 0,1 · 0,2 · 0,3 ...
+          s.nota = limitar(s.nota - pontosDerrotaSeguida(s.sequenciaDerrota), NOTA_MIN, NOTA_MAX); // −0,1 · 0,2 · 0,3 ...
           s.sequencia = 0; // perder quebra o combo de vitórias
         }
       }
     }
   }
 
-  for (const s of stats.values()) {
-    s.nota = calcularNota(s, 0); // nota provisória (sem campeão); o bônus entra em notasComCampeoes
-  }
+  // nota já vem travada rodada a rodada; o bônus de título entra em notasComCampeoes.
   return stats;
 }
 
@@ -500,12 +493,16 @@ function notasComCampeoes(estado: Estado, rodadas: Rodada[]): Map<string, Estati
   const stats = estatisticasPorRodadas(rodadas);
   const campeoes = campeonatosPorJogador(estado);
   const totalDecididas = rodadas.filter((r) => r.resultado !== "andamento").length;
-  // Campeão que nunca jogou nenhuma rodada conta como tendo faltado a todas (a nota cai da base + título).
+  // Campeão que nunca jogou conta como ausente em todas — a nota só cai até o piso (6).
   for (const id of campeoes.keys()) {
-    if (!stats.has(id)) stats.set(id, { ...novoStat(), ausencias: totalDecididas });
+    if (!stats.has(id)) {
+      const s = { ...novoStat(), ausencias: totalDecididas };
+      s.nota = limitar(NOTA_BASE - totalDecididas * PASSO_AUSENCIA, NOTA_MIN, NOTA_MAX);
+      stats.set(id, s);
+    }
   }
   for (const [id, s] of stats) {
-    s.nota = calcularNota(s, campeoes.get(id) ?? 0);
+    s.nota = comTitulos(s.nota, campeoes.get(id) ?? 0);
   }
   return stats;
 }
@@ -643,6 +640,7 @@ export function evolucaoNotaJogador(estado: Estado, jogadorId: string): PontoEvo
     if (ausente) {
       s.ausencias++;
       s.sequencia = 0; // faltar zera o combo de vitória
+      s.nota = limitar(s.nota - PASSO_AUSENCIA, NOTA_MIN, NOTA_MAX);
       resultado = "ausencia";
     } else if (noVermelho || noAzul) {
       const time = noVermelho ? "vermelho" : "azul";
@@ -650,19 +648,19 @@ export function evolucaoNotaJogador(estado: Estado, jogadorId: string): PontoEvo
         resultado = "empate"; // neutro
       } else if (r.resultado === time) {
         s.sequencia++;
-        s.pontosVitoria += pontosVitoriaSeguida(s.sequencia);
+        s.nota = limitar(s.nota + pontosVitoriaSeguida(s.sequencia), NOTA_MIN, NOTA_MAX);
         s.sequenciaDerrota = 0;
         resultado = "vitoria";
       } else {
         s.sequenciaDerrota++;
-        s.pontosDerrota += pontosDerrotaSeguida(s.sequenciaDerrota);
+        s.nota = limitar(s.nota - pontosDerrotaSeguida(s.sequenciaDerrota), NOTA_MIN, NOTA_MAX);
         s.sequencia = 0;
         resultado = "derrota";
       }
     } else {
       continue; // rodada não envolveu o jogador
     }
-    pontos.push({ data: r.data, rodada: pontos.length + 1, nota: calcularNota(s, campeonatos), resultado });
+    pontos.push({ data: r.data, rodada: pontos.length + 1, nota: comTitulos(s.nota, campeonatos), resultado });
   }
   return pontos;
 }
