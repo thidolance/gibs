@@ -6,10 +6,11 @@
 
   const NOTA_BASE = 6, NOTA_MIN = 6, NOTA_MAX = 10, PCAMP = 0.5, PAUS = 0.1;
   const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
-  const novoStat = () => ({ v: 0, d: 0, em: 0, j: 0, aus: 0, seq: 0, seqD: 0, pv: 0, pd: 0, nota: NOTA_BASE });
+  const novoStat = () => ({ v: 0, d: 0, em: 0, j: 0, aus: 0, seq: 0, seqD: 0, nota: NOTA_BASE });
   const comboV = (seq) => 0.1 * (seq + 1); // 0,2 · 0,3 · 0,4 ... por vitória seguida
   const comboD = (seq) => 0.1 * seq;       // 0,1 · 0,2 · 0,3 ... por derrota seguida
-  const notaCalc = (s, camp) => limitar(NOTA_BASE + s.pv + (camp || 0) * PCAMP - s.pd - (s.aus || 0) * PAUS, NOTA_MIN, NOTA_MAX);
+  // A nota é saldo corrente travado em [6,10] a cada rodada; o título entra por cima do saldo.
+  const comTitulos = (nota, camp) => limitar(nota + (camp || 0) * PCAMP, NOTA_MIN, NOTA_MAX);
   const arr = (v) => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -76,19 +77,19 @@
     for (const r of dec) {
       const aus = {}; (r.ausentes || []).forEach((id) => aus[id] = 1);
       // Ausência só pune quem foi escalado e faltou: tira 0,1 e zera o combo de vitória.
-      for (const id in aus) { if (!t[id]) t[id] = novoStat(); t[id].aus++; t[id].seq = 0; }
+      for (const id in aus) { if (!t[id]) t[id] = novoStat(); t[id].aus++; t[id].seq = 0; t[id].nota = limitar(t[id].nota - PAUS, NOTA_MIN, NOTA_MAX); }
       [[r.timeVermelho, r.resultado === "vermelho"], [r.timeAzul, r.resultado === "azul"]].forEach(([tm, w]) => {
         (tm || []).forEach((id) => {
           if (aus[id]) return; // escalado que faltou não joga nem pontua
           if (!t[id]) t[id] = novoStat();
           const x = t[id]; x.j++;
           if (r.resultado === "empate") x.em++;
-          else if (w) { x.v++; x.seq++; x.pv += comboV(x.seq); x.seqD = 0; }
-          else { x.d++; x.seqD++; x.pd += comboD(x.seqD); x.seq = 0; }
+          else if (w) { x.v++; x.seq++; x.nota = limitar(x.nota + comboV(x.seq), NOTA_MIN, NOTA_MAX); x.seqD = 0; }
+          else { x.d++; x.seqD++; x.nota = limitar(x.nota - comboD(x.seqD), NOTA_MIN, NOTA_MAX); x.seq = 0; }
         });
       });
     }
-    for (const id in t) t[id].nota = notaCalc(t[id], 0);
+    // nota já vem travada rodada a rodada; o bônus de título entra em estatComCampeoes.
     return t;
   }
   // Estatísticas + bônus de campeão (+0,5 por título), recalculando a nota.
@@ -96,8 +97,8 @@
     const t = estatisticas(rodadas);
     const camp = campeoesPorId(e);
     const total = rodadas.filter((r) => r.resultado !== "andamento").length;
-    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = Object.assign(novoStat(), { aus: total }); });
-    for (const id in t) t[id].nota = notaCalc(t[id], camp[id] || 0);
+    Object.keys(camp).forEach((id) => { if (!t[id]) t[id] = Object.assign(novoStat(), { aus: total, nota: limitar(NOTA_BASE - total * PAUS, NOTA_MIN, NOTA_MAX) }); });
+    for (const id in t) t[id].nota = comTitulos(t[id].nota, camp[id] || 0);
     return t;
   }
   const statPad = (st, id) => st[id] || novoStat();
@@ -146,14 +147,14 @@
       const ausente = (r.ausentes || []).includes(id);
       const noV = (r.timeVermelho || []).includes(id), noA = (r.timeAzul || []).includes(id);
       let res;
-      if (ausente) { s.aus++; s.seq = 0; res = "ausencia"; }
+      if (ausente) { s.aus++; s.seq = 0; s.nota = limitar(s.nota - PAUS, NOTA_MIN, NOTA_MAX); res = "ausencia"; }
       else if (noV || noA) {
         const time = noV ? "vermelho" : "azul";
         if (r.resultado === "empate") res = "empate";
-        else if (r.resultado === time) { s.seq++; s.pv += comboV(s.seq); s.seqD = 0; res = "vitoria"; }
-        else { s.seqD++; s.pd += comboD(s.seqD); s.seq = 0; res = "derrota"; }
+        else if (r.resultado === time) { s.seq++; s.nota = limitar(s.nota + comboV(s.seq), NOTA_MIN, NOTA_MAX); s.seqD = 0; res = "vitoria"; }
+        else { s.seqD++; s.nota = limitar(s.nota - comboD(s.seqD), NOTA_MIN, NOTA_MAX); s.seq = 0; res = "derrota"; }
       } else continue;
-      pts.push({ data: r.data, rodada: pts.length + 1, nota: notaCalc(s, camp), resultado: res });
+      pts.push({ data: r.data, rodada: pts.length + 1, nota: comTitulos(s.nota, camp), resultado: res });
     }
     return pts;
   }
